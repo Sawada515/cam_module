@@ -19,12 +19,12 @@
 
 /**
  * @class TcpSocket
- * @brief TCPで双方向通信するためのクラス
+ * @brief TCPで双方向通信するためのクラス(ノンブロッキング)
  */
-class TcpScoket {
+class TcpSocket {
     public:
-        TcpScoket(const std::string& hostname, std::uint16_t port);
-        ~TcpScoket();
+        TcpSocket(const std::string& hostname, std::uint16_t port);
+        ~TcpSocket();
 
         /**
          * @brief データの送信
@@ -48,6 +48,10 @@ class TcpScoket {
          */
         bool is_connected() const;
     private:
-}
+        int sock_fd_ = -1;
+        bool is_connected_ = false;
+
+        void set_non_blocking(int fd);
+};
 
 #endif
