@@ -21,6 +21,9 @@
 #include "camera/v4l2_capture.hpp"
 #include "logger/logger.hpp"
 
+static int xioctl(int fd, unsigned long req, void* arg);
+static int xpoll(struct pollfd* poll_fds, nfds_t nfds, int timeout);
+
 static int xioctl(int fd, unsigned long req, void* arg)
 {
     int ret;
@@ -87,7 +90,7 @@ V4L2Capture::~V4L2Capture()
 }
 
 
-void V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
+bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
 {
     pollfd poll_fd{};
 
@@ -162,6 +165,26 @@ void V4L2Capture::stream_off()
 
 void V4L2Capture::reconfigure(frame_format fmt)
 {
+    constexpr int MAX_RETRY = 5;
+    constexpr int DELAY_US = 5000;
+
+    bool is_pass_fmt_check;
+
+    for (int i = 0; i < MAX_RETRY; ++i) {
+        is_pass_fmt_check = try_format(width_, height_, static_cast<std::uint32_t>(fmt));
+
+        if(!is_pass_fmt_check && (errno == EBUSY || errno == EAGAIN)) {
+            usleep(DELAY_US);
+        }
+        else {
+            break;
+        }
+    }
+
+    if(!is_pass_fmt_check) {
+        throw std::runtime_error("not supprted fmt");
+    }
+
     stream_off();
 
     cleanup_buffers();
@@ -268,4 +291,29 @@ void V4L2Capture::cleanup_buffers()
     }
 
     buffers_.clear();
+}
+
+bool V4L2Capture::try_format(std::uint16_t width, std::uint16_t height, uint32_t pixfmt)
+{
+    v4l2_format original{};
+    original.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+
+    if (xioctl(device_fd_, VIDIOC_G_FMT, &original) < 0) {
+        return false;
+    }
+
+    v4l2_format trial = original;
+    trial.fmt.pix.pixelformat = pixfmt;
+    trial.fmt.pix.width = width;
+    trial.fmt.pix.height = height;
+
+    if (xioctl(device_fd_, VIDIOC_S_FMT, &trial) < 0) {
+        return false;
+    }
+
+    bool accepted = (trial.fmt.pix.pixelformat == pixfmt && trial.fmt.pix.width == width && trial.fmt.pix.height == height);
+
+    xioctl(device_fd_, VIDIOC_S_FMT, &original);
+
+    return accepted;
 }

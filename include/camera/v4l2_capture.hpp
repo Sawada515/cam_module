@@ -15,7 +15,6 @@
 #include <string>
 #include <vector>
 #include <stdexcept>
-#include <optional>
 
 /**
  * @class V4L2Capture
@@ -57,7 +56,7 @@ class V4L2Capture {
         /**
          * @brief フレームの取得
          */
-        void capture_frame(Frame& frame);
+        bool capture_frame(Frame& frame);
 
         /**
          * @brief ストリームのON
@@ -104,6 +103,8 @@ class V4L2Capture {
         void set_frame_format();
 
         void cleanup_buffers();
+
+        bool try_format(std::uint16_t width, std::uint16_t height, uint32_t pixfmt);
 };
 
 #endif
