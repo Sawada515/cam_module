@@ -7,6 +7,7 @@
 
 #include <utility>
 #include <chrono>
+#include <system_error>
 
 #include "logger/logger.hpp"
 #include "camera/v4l2_capture.hpp"
@@ -24,6 +25,8 @@ CaptureThread::CaptureThread(
     , require_buffer_size_(width * height * YUV422_BYTES_PER_PIXEL)
     , current_fmt_(fmt)
 {
+    create_empty_frame(latest_frame_);
+
     worker_ = std::thread(&CaptureThread::thread_loop, this);
 
     spdlog::info("CaptureThread started: {}, {}x{}", device_file_name_, width_, height_);
@@ -62,11 +65,11 @@ bool CaptureThread::get_latest_frame(V4L2Capture::Frame& frame)
 {
     std::lock_guard<std::mutex> lock(frame_mtx_);
 
-    if (!has_new_frame_ || !latest_frame_.has_value()) {
+    if (!has_new_frame_ || latest_frame_.size == 0) {
         return false;
     }
 
-    std::swap(frame, *latest_frame_);
+    std::swap(frame, latest_frame_);
 
     has_new_frame_ = false;
 
@@ -76,4 +79,100 @@ bool CaptureThread::get_latest_frame(V4L2Capture::Frame& frame)
 void CaptureThread::stop()
 {
     stop_flag_.store(true);
+}
+
+void CaptureThread::thread_loop()
+{
+    std::optional<V4L2Capture> camera;
+
+    try {
+        camera.emplace(
+            device_file_name_,
+            width_,
+            height_,
+            current_fmt_
+        );
+
+        V4L2Capture::Frame back_frame;
+
+        create_empty_frame(back_frame);
+
+        try {
+            camera->stream_on();
+        }
+        catch (const std::system_error& e) {
+            spdlog::error("camera error: {} (code: {})", e.what(), e.code().value());
+
+            return;
+        }
+
+        while(!stop_flag_.load(std::memory_order_relaxed)) {
+            {
+                std::unique_lock<std::mutex> lock(fmt_mtx_);
+                if (request_fmt_.has_value()) {
+                    change_format(camera, request_fmt_.value());
+                }
+
+                request_fmt_ = std::nullopt;
+            }
+
+            if (!camera.has_value()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+                continue;
+            }
+
+            if(!camera->capture_frame(back_frame)) {
+                continue;
+            }
+
+            {
+                std::lock_guard<std::mutex> lock(frame_mtx_);
+
+                std::swap(latest_frame_, back_frame);
+
+                has_new_frame_ = true;
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        spdlog::error("Capture thread error: {}", e.what());
+    }
+
+    spdlog::info("Capture thread stopped");
+}
+
+void CaptureThread::change_format(std::optional<V4L2Capture>& camera, V4L2Capture::frame_format reqest_fmt)
+{
+    try {
+        if (camera.has_value()) {
+            camera->reconfigure(reqest_fmt);
+        }
+        else {
+            camera.emplace(device_file_name_, width_, height_, reqest_fmt);
+        }
+
+        camera->stream_on();
+
+        current_fmt_ = reqest_fmt;
+    }
+    catch (const std::exception& e) {
+        spdlog::error("Reconfigure failed: {}", e.what());
+
+        camera.reset();
+
+        try {
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+
+            camera.emplace(device_file_name_, width_, height_, reqest_fmt);
+            camera->stream_on();
+
+            current_fmt_ = reqest_fmt;
+
+            spdlog::info("Camera recovered");
+        }
+        catch (const std::exception& e) {
+            spdlog::critical("Recovery failed: {}", e.what());
+        }
+    }
 }

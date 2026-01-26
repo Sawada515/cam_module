@@ -67,7 +67,7 @@ class CaptureThread {
 
         const size_t require_buffer_size_;
 
-        std::optional<V4L2Capture::Frame> latest_frame_;
+        V4L2Capture::Frame latest_frame_;
 
         mutable std::mutex frame_mtx_;
 
@@ -82,6 +82,8 @@ class CaptureThread {
         std::mutex fmt_mtx_;
 
         void thread_loop();
+
+        void change_format(std::optional<V4L2Capture>& camera, V4L2Capture::frame_format reqest_fmt);
 };
 
 #endif 
