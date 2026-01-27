@@ -27,7 +27,7 @@ UdpSocket::UdpSocket(const std::string& hostname, std::uint16_t port)
     if (getaddrinfo(hostname.c_str(), std::to_string(port).c_str(), &hints, &res) != 0) {
         close(sock_fd_);
 
-        throw std::runtime_error("Failed to resolve hostname");
+        throw std::runtime_error("Failed to resolve hostname : " + hostname);
     }
 
     std::memcpy(&dest_addr_, res->ai_addr, sizeof(struct sockaddr_in));

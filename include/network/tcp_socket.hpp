@@ -9,11 +9,6 @@
 #include <cstring>
 #include <cstdint>
 
-#include <sys/socket.h>
-#include <arpa/inet.h>
-#include <netdb.h>
-#include <unistd.h>
-
 #ifndef TCP_SOCKET_HPP_
 #define TCP_SOCKET_HPP_
 
@@ -32,7 +27,7 @@ class TcpSocket {
          * @param[in] length 送信データのサイズ
          * @return bool 0 : 成功 errno : 失敗
          */
-        int send_raw_packet(const void *packet_ptr, size_t length);
+        ssize_t send_raw_packet(const void *packet_ptr, size_t length);
 
         /**
          * @brief データの受信
