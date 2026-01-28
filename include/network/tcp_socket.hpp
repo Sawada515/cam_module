@@ -9,6 +9,10 @@
 #include <cstring>
 #include <cstdint>
 
+#include <sys/uio.h>
+#include <vector>
+#include <deque>
+
 #ifndef TCP_SOCKET_HPP_
 #define TCP_SOCKET_HPP_
 
@@ -46,13 +50,13 @@ class TcpSocket {
          */
         void handle_poll(short revents);
 
-        /**
-         * @brief データの送信
-         * @param[in] packet_ptr 送信データの先頭アドレス
-         * @param[in] length 送信データのサイズ
-         * @return bool 0 : 成功 errno : 失敗
-         */
-        send_state try_send(const void *packet_ptr, size_t length, ssize_t& sent_length);
+        // /**
+        //  * @brief データの送信
+        //  * @param[in] packet_ptr 送信データの先頭アドレス
+        //  * @param[in] length 送信データのサイズ
+        //  * @return bool 0 : 成功 errno : 失敗
+        //  */
+        // send_state try_send(const void *packet_ptr, size_t length, ssize_t& sent_length);
 
         /**
          * @brief データの受信
@@ -62,6 +66,30 @@ class TcpSocket {
          * @return 状態
          */
         recv_state try_recv(void *buffer, size_t length, ssize_t& received_length);
+
+        /**
+         * @brief 送信データをenqueue
+         * @details データを内部queueにmoveする
+         * @param[in] data 送信データ std::moveを使用
+         */
+        void enqueue_data(std::vector<std::uint8_t> data);
+
+        /**
+         * @brief enqueueされているデータをすべて送信
+         * @details POLLOUT検出時に呼び出して溜まっているデータをsendmsgで送信
+         * @return send_state
+         */
+        send_state send_enqueued_data();
+
+        /**
+         * @brief 内部queueのクリア
+         */
+        void clear_queue();
+
+        /**
+         * @brief 内部queueにデータがあるか
+         */
+        bool has_pending_data() const;
 
         /**
          * @brief 接続状況の確認
@@ -86,6 +114,12 @@ class TcpSocket {
          * @return bool
          */
         bool can_recv() const;
+
+        /**
+         * @brief ソケット ファイルディスクリプタの取得
+         * @return ファイルディスクリプタ
+         */
+        int get_fd() const;
     private:
         enum class connection_state : std::uint8_t {
             CONNECTING,
@@ -98,6 +132,12 @@ class TcpSocket {
 
         connection_state state_;
         int last_error_; 
+
+        std::deque<std::vector<std::uint8_t>> send_queue_;
+
+        size_t current_packet_offset_ = 0;
+
+        static constexpr int MAX_IOV_COUNT = 16;
 };
 
 #endif

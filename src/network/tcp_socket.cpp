@@ -9,8 +9,9 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/socket.h>
 #include <poll.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
 
 #include <cerrno>
 #include <cstring>
@@ -50,6 +51,7 @@ TcpSocket::TcpSocket(const std::string& ip_addr, std::uint16_t port)
     : sock_fd_(-1)
     , state_(connection_state::CLOSED)
     , last_error_(0)
+    , current_packet_offset_(0)
 {
     sock_fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd_ < 0) {
@@ -117,11 +119,17 @@ short TcpSocket::poll_events() const
 {
     switch (state_) {
         case connection_state::CONNECTING:
-            return POLLIN | POLLOUT;
-        case connection_state::CONNECTED:
-            return POLLIN | POLLOUT;
-        case connection_state::PEER_CLOSED:
             return POLLOUT;
+        case connection_state::CONNECTED:
+            short event = POLLIN;
+
+            if (!send_queue_.empty()) {
+                event |= POLLOUT;
+            }
+
+            return event;
+        case connection_state::PEER_CLOSED:
+            return POLLIN;
         case connection_state::ERROR:
         case connection_state::CLOSED:
         default:
@@ -154,9 +162,15 @@ void TcpSocket::handle_poll(short revents)
 
             return;
         }
-        if ((revents & POLLHUP) && err == 0) {
-            state_ = connection_state::PEER_CLOSED;
+        else {
+            last_error_ = ECONNRESET;
         }
+
+        state_ = connection_state::ERROR;
+
+        clear_queue();
+
+        return;
     }
 
     if (state_ == connection_state::CONNECTING) {
@@ -174,6 +188,7 @@ void TcpSocket::handle_poll(short revents)
     }
 }
 
+/*
 TcpSocket::send_state TcpSocket::try_send(const void *packet_ptr, size_t length, ssize_t& sent_length)
 {
     sent_length = 0;
@@ -204,6 +219,7 @@ TcpSocket::send_state TcpSocket::try_send(const void *packet_ptr, size_t length,
 
     return send_state::DATA_SENT;
 }
+*/
 
 TcpSocket::recv_state TcpSocket::try_recv(void *buffer, size_t length, ssize_t& received_length)
 {
@@ -241,18 +257,133 @@ TcpSocket::recv_state TcpSocket::try_recv(void *buffer, size_t length, ssize_t& 
     return recv_state::DATA_RECEIVED;
 }
 
-bool TcpSocket::is_connected() const {
+void TcpSocket::enqueue_data(std::vector<std::uint8_t> data)
+{
+    if (data.empty()) {
+        return;
+    }
+
+    send_queue_.push_back(std::move(data));
+}
+
+TcpSocket::send_state TcpSocket::send_enqueued_data() 
+{
+    if (state_ == connection_state::CONNECTING) {
+        return send_state::TRY_LATER;
+    }
+
+    if (state_ != connection_state::CONNECTED) {
+        return send_state::CLOSED;
+    }
+
+    if (send_queue_.empty()) {
+        return send_state::DATA_SENT;
+    }
+
+    struct iovec iov[MAX_IOV_COUNT];
+    int iov_cnt = 0;
+
+    for (const auto& pkt : send_queue_) {
+        if (iov_cnt >= MAX_IOV_COUNT) {
+            break;
+        }
+
+        if (iov_cnt == 0) {
+            iov[0].iov_base = const_cast<std::uint8_t*>(pkt.data() + current_packet_offset_);
+            iov[0].iov_len  = pkt.size() - current_packet_offset_;
+        } else {
+            iov[iov_cnt].iov_base = const_cast<std::uint8_t*>(pkt.data());
+            iov[iov_cnt].iov_len  = pkt.size();
+        }
+
+        iov_cnt += 1;
+    }
+
+    struct msghdr msg = {};
+    msg.msg_iov = iov;
+    msg.msg_iovlen = iov_cnt;
+
+    ssize_t sent_bytes;
+    do {
+        sent_bytes = ::sendmsg(sock_fd_, &msg, MSG_NOSIGNAL);
+    } while (sent_bytes < 0 && errno == EINTR);
+
+    if (sent_bytes < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+            return send_state::TRY_LATER;
+        }
+        
+        last_error_ = errno;
+        
+        if (errno == EPIPE || errno == ECONNRESET) {
+            state_ = connection_state::ERROR; 
+
+            clear_queue();
+
+            return send_state::CLOSED;
+        }
+
+        state_ = connection_state::ERROR;
+
+        clear_queue();
+
+        return send_state::ERROR;
+    }
+
+    size_t remaining = static_cast<size_t>(sent_bytes);
+
+    while (remaining > 0 && !send_queue_.empty()) {
+        auto& front_pkt = send_queue_.front();
+        size_t front_rem_size = front_pkt.size() - current_packet_offset_;
+
+        if (remaining >= front_rem_size) {
+            remaining -= front_rem_size;
+
+            send_queue_.pop_front();
+
+            current_packet_offset_ = 0;
+        } else {
+            current_packet_offset_ += remaining;
+
+            remaining = 0;
+        }
+    }
+
+    return send_state::DATA_SENT;
+}
+
+void TcpSocket::clear_queue()
+{
+    send_queue_.clear();
+    current_packet_offset_ = 0;
+}
+
+bool TcpSocket::has_pending_data() const
+{
+    return !send_queue_.empty();
+}
+
+bool TcpSocket::is_connected() const
+{
     return state_ == connection_state::CONNECTED;
 }
 
-bool TcpSocket::is_connecting() const {
+bool TcpSocket::is_connecting() const
+{
     return state_ == connection_state::CONNECTING;
 }
 
-bool TcpSocket::can_send() const {
-    return state_ == connection_state::CONNECTED || state_ == connection_state::PEER_CLOSED;
+bool TcpSocket::can_send() const
+{
+    return state_ == connection_state::CONNECTED;
 }
 
-bool TcpSocket::can_recv() const {
+bool TcpSocket::can_recv() const
+{
     return state_ == connection_state::CONNECTED;
+}
+
+int TcpSocket::get_fd() const
+{
+    return sock_fd_;
 }
