@@ -18,8 +18,33 @@
  */
 class TcpSocket {
     public:
+        enum class recv_state : std::uint8_t {
+            DATA_RECEIVED,
+            TRY_LATER,
+            CLOSED,
+            ERROR
+        };
+
+        enum class send_state : std::uint8_t {
+            DATA_SENT,
+            TRY_LATER,
+            CLOSED,
+            ERROR
+        };
+
         TcpSocket(const std::string& hostname, std::uint16_t port);
         ~TcpSocket();
+
+        /**
+         * @brief 監視するイベントの設定
+         * @return POLLERR, POLLHUP, POLLNVAL
+         */
+        short poll_events() const;
+
+        /**
+         * @イベントを
+         */
+        void handle_poll(short revents);
 
         /**
          * @brief データの送信
@@ -27,26 +52,26 @@ class TcpSocket {
          * @param[in] length 送信データのサイズ
          * @return bool 0 : 成功 errno : 失敗
          */
-        ssize_t send_raw_packet(const void *packet_ptr, size_t length);
+        send_state try_send(const void *packet_ptr, size_t length, ssize_t& sent_length);
 
         /**
          * @brief データの受信
-         * @param[out] buffer 受信データ
+         * @param[in] buffer 受信データ
          * @param[in] length 受信したいサイズ 
-         * @return 実際に受信したサイズ(0 : disconnected, -1 : error)
+         * @param[out] received_length 受信したサイズ
+         * @return 状態
          */
-        ssize_t receive_data(void *buffer, size_t length);
+        recv_state try_recv(void *buffer, size_t length, ssize_t& received_length);
 
         /**
          * @brief 接続状況の確認
          * @return bool true : 接続, false : 接続断
          */
-        bool is_connected() const;
+        bool alive() const;
     private:
-        int sock_fd_ = -1;
-        bool is_connected_ = false;
-
-        void set_non_blocking(int fd);
+        int sock_fd_;
+        bool alive_ = false;
+        bool connecting_ = true;
 };
 
 #endif

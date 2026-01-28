@@ -5,154 +5,198 @@
  * @date 2026-01-27
  */
 
-#include <string>
-#include <cstring>
-#include <stdexcept>
-#include <vector>
-
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <unistd.h>
 #include <fcntl.h>
-#include <sys/poll.h>
 #include <sys/socket.h>
-#include <errno.h>
+#include <poll.h>
+
+#include <cerrno>
+#include <cstring>
+#include <stdexcept>
 
 #include "logger/logger.hpp"
 #include "network/tcp_socket.hpp"
+#include "network/resolve_hostname.hpp"
+
+namespace {
+    void set_non_blocking(int fd)
+    {
+        int flags = ::fcntl(fd, F_GETFL, 0);
+        if (flags < 0) {
+            throw std::runtime_error("fcntl(F_FETFL) failed");
+        }
+
+        if (::fcntl(fd, F_SETFL, flags | O_NONBLOCK) < 0) {
+            throw std::runtime_error("fcntl(F_SETFL) failed");
+        }
+    }
+}
 
 TcpSocket::TcpSocket(const std::string& hostname, std::uint16_t port)
     : sock_fd_(-1)
-    , is_connected_(false)
+    , alive_(false)
+    , connecting_(true)
 {
-    sock_fd_ = socket(AF_INET, SOCK_STREAM, 0);
+    sock_fd_ = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sock_fd_ < 0) {
-        throw std::runtime_error("Failed to create socket");
+        throw std::runtime_error("socket() failed");
     }
 
-    set_non_blocking(sock_fd_);
+    try {
+        set_non_blocking(sock_fd_);
 
-    struct addrinfo hints, *res;
-    std::memset(&hints, 0, sizeof(hints));
+        struct addrinfo hints{};
+        struct addrinfo* res = nullptr;
 
-    hints.ai_family = AF_INET;
-    hints.ai_socktype = SOCK_STREAM;
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_STREAM;
 
-    if (getaddrinfo(hostname.c_str(), std::to_string(port).c_str(), &hints, &res) != 0) {
-        close(sock_fd_);
 
-        throw std::runtime_error("Failed to resolve hostname : " + hostname);
-    }
-
-    int ret = connect(sock_fd_, res->ai_addr, res->ai_addrlen);
-
-    freeaddrinfo(res);
-
-    if (ret < 0) {
-        if (errno != EINPROGRESS) {
-            close(sock_fd_);
-
-            spdlog::error("Connection failed : {}", std::string(strerror(errno)));
-
-            throw std::runtime_error("Connection failed : " + std::string(strerror(errno)));
+        const std::string service = std::to_string(port);
+        int ret = ::getaddrinfo(hostname.c_str(), service.c_str(), &hints, &res);
+        if (ret != 0) {
+            throw std::runtime_error("getaddrinfo failed");
         }
 
-        struct pollfd poll_fd;
-        poll_fd.fd = sock_fd_;
-        poll_fd.events = POLLOUT;
+        ret = ::connect(sock_fd_, res->ai_addr, res->ai_addrlen);
 
-        int poll_ret = poll(&poll_fd, 1, 3000);
-        if (poll_ret == 0) {
-            close(sock_fd_);
+        ::freeaddrinfo(res);
 
-            throw std::runtime_error("Connection timeout");
-        }
-        else if (poll_ret < 0) {
-            close(sock_fd_);
-
-            throw std::runtime_error("poll failed during connection");
-        }
-
-        int so_error = 0;
-        socklen_t sock_len = sizeof(so_error);
-        if (getsockopt(sock_fd_, SOL_SOCKET, SO_ERROR, &so_error, &sock_len) < 0 || so_error != 0) {
-            close(sock_fd_);
-
-            throw std::runtime_error("Connection failed : " + std::string(strerror(so_error)));
+        if (ret < 0 && errno != EINPROGRESS) {
+            throw std::runtime_error(std::string("connect failed: ") + std::strerror(errno));
         }
     }
+    catch (...) {
+        ::close(sock_fd_);
 
-    is_connected_ = true;
+        sock_fd_ = -1;
+        alive_ = false;
+
+        throw;
+    }
 }
+
 
 TcpSocket::~TcpSocket()
 {
     if (sock_fd_ >= 0) {
-        close(sock_fd_);
+        ::close(sock_fd_);
+    }
+
+    alive_ = false;
+    connecting_ = false;
+}
+
+
+short TcpSocket::poll_events() const
+{
+    if (!alive_ && !connecting_) {
+        return 0;
+    }
+
+    short ev = POLLERR | POLLHUP | POLLNVAL;
+
+    if (connecting_) {
+        ev |= POLLOUT;
+    }
+    else {
+        ev |= POLLIN | POLLOUT;
+    }
+
+    return ev;
+}
+
+
+void TcpSocket::handle_poll(short revents)
+{
+    if (revents & (POLLERR | POLLHUP | POLLNVAL)) {
+        alive_ = false;
+
+        return;
+    }
+
+    if (connecting_ && (revents & POLLOUT)) {
+        int err = 0;
+
+        socklen_t len = sizeof(err);
+
+        if (::getsockopt(sock_fd_, SOL_SOCKET, SO_ERROR, &err, &len) < 0 || err != 0) {
+            alive_ = false;
+
+            connecting_ = false;
+        }
+        else {
+            connecting_ = false;
+
+            alive_ =  true;
+        }
     }
 }
 
-ssize_t TcpSocket::send_raw_packet(const void *packet_ptr, size_t length)
+TcpSocket::send_state TcpSocket::try_send(const void *packet_ptr, size_t length, ssize_t& sent_length)
 {
-    if (!is_connected_) {
+    if (!alive_) {
         errno = ENOTCONN;
 
-        return -1;
+        return send_state::ERROR;
     }
 
-    ssize_t send_bytes = send(sock_fd_, packet_ptr, length, MSG_NOSIGNAL);
+    sent_length = 0;
 
-    if (send_bytes < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
-            return 0;   //再試行させるため
-        }
-        else if (errno == EINTR) {
-            return 0;
+    ssize_t ret = ::send(sock_fd_, packet_ptr, length, MSG_NOSIGNAL);
+    if (ret < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+            return send_state::TRY_LATER;
         }
 
-        is_connected_ = false;
+        alive_ = false;
 
-        return -1;
+        return send_state::CLOSED;
     }
 
-    return send_bytes;
+    sent_length = ret;
+
+    return send_state::DATA_SENT;
 }
 
-ssize_t TcpSocket::receive_data(void *buffer, size_t length)
+
+TcpSocket::recv_state TcpSocket::try_recv(void *buffer, size_t length, ssize_t& received_length)
 {
-    if (!is_connected_) {
-        return -1;
+    if (!alive_) {
+        errno = ENOTCONN;
+
+        return recv_state::ERROR;
     }
 
-    ssize_t receive_bytes = recv(sock_fd_, buffer, length, 0);
 
-    if (receive_bytes < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+    received_length = 0;
 
-            return 0; 
+    ssize_t ret = ::recv(sock_fd_, buffer, length, 0);
+    if (ret < 0) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+            return recv_state::TRY_LATER;
         }
-        is_connected_ = false;
 
-        return -1;
-    }
-    else if (receive_bytes  == 0) {
-        is_connected_ = false;
+        alive_ = false;
 
-        return -1;
+        return recv_state::ERROR;
     }
 
-    return receive_bytes ;
+    if (ret == 0) {
+        alive_ = false;
+
+        return recv_state::CLOSED;
+    }
+    
+    received_length = ret;
+
+    return recv_state::DATA_RECEIVED;
 }
 
-bool TcpSocket::is_connected() const
-{
-    return is_connected_;
-}
 
-void TcpSocket::set_non_blocking(int fd)
+bool TcpSocket::alive() const
 {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags != -1) {
-        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
-    }
+    return alive_;
 }
