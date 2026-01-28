@@ -32,7 +32,7 @@ class TcpSocket {
             ERROR
         };
 
-        TcpSocket(const std::string& hostname, std::uint16_t port);
+        TcpSocket(const std::string& ip_addr, std::uint16_t port);
         ~TcpSocket();
 
         /**
@@ -67,11 +67,37 @@ class TcpSocket {
          * @brief 接続状況の確認
          * @return bool true : 接続, false : 接続断
          */
-        bool alive() const;
+        bool is_connected() const;
+
+        /**
+         * @brief 接続状況の確認
+         * @return bool true : 接続, false : 接続断
+         */
+        bool is_connecting() const;
+
+        /**
+         * @brief 送信可能か
+         * @return bool 
+         */
+        bool can_send() const;
+
+        /**
+         * @brief 受信可能か
+         * @return bool
+         */
+        bool can_recv() const;
     private:
+        enum class connection_state : std::uint8_t {
+            CONNECTING,
+            CONNECTED,
+            PEER_CLOSED,
+            ERROR,
+            CLOSED
+        };
         int sock_fd_;
-        bool alive_ = false;
-        bool connecting_ = true;
+
+        connection_state state_;
+        int last_error_; 
 };
 
 #endif
