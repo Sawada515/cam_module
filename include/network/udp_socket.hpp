@@ -1,5 +1,5 @@
 /**
- * @file udp_sender.hpp
+ * @file udp_socket.hpp
  * @brief UDP送信クラス
  * @author sawada
  * @date 2026-01-26
@@ -14,7 +14,7 @@
  */
 class UdpSocket {
     public:
-        UdpSocket(const std::string& hostname, std::uint16_t port);
+        UdpSocket(const std::string& ip_addr, std::uint16_t port);
         ~UdpSocket();
 
         /**
@@ -28,7 +28,7 @@ class UdpSocket {
     private:
         int sock_fd_ = -1;
 
-        struct sockaddr_in dest_addr_{};
+        struct sockaddr_in addr_{};
 };
 
 #endif

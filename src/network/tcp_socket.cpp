@@ -120,7 +120,7 @@ short TcpSocket::poll_events() const
     switch (state_) {
         case connection_state::CONNECTING:
             return POLLOUT;
-        case connection_state::CONNECTED:
+        case connection_state::CONNECTED: {
             short event = POLLIN;
 
             if (!send_queue_.empty()) {
@@ -128,6 +128,7 @@ short TcpSocket::poll_events() const
             }
 
             return event;
+        }
         case connection_state::PEER_CLOSED:
             return POLLIN;
         case connection_state::ERROR:

@@ -1,0 +1,17 @@
+network:
+  #接続先のホスト名を指定
+  dest_hostname: "localhost"
+  tcp_json_port: 55555
+  udp_send_image_port: 50000
+
+camera:
+  #1台のみ使用
+  cam_device: "/dev/video0"
+  width: 1280
+  height: 960
+  # "MJPEG" or "YUV422" のみ指定可能
+  default_fmt: "MJPEG"
+
+image_processor:
+  # 0 - 100
+  jpeg_quality: 90

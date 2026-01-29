@@ -30,7 +30,7 @@ class V4L2Capture {
          */
         enum class frame_format : std::uint32_t {
             YUV422 = V4L2_PIX_FMT_YUYV,
-            MJPG = V4L2_PIX_FMT_MJPEG
+            MJPEG = V4L2_PIX_FMT_MJPEG
         };
 
         /**
