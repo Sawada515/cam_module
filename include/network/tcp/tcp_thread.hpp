@@ -57,6 +57,8 @@ private:
     void thread_loop();
     bool resolve_and_connect();
 
+    void process_receive_buffer();
+
     std::string hostname_;
     std::uint16_t port_;
 
@@ -71,6 +73,8 @@ private:
     std::deque<std::vector<std::uint8_t>> recv_queue_;
 
     std::deque<std::vector<std::uint8_t>> thread_send_queue_;
+
+    std::vector<std::uint8_t> recv_buffer_;
 };
 
 #endif

@@ -9,7 +9,7 @@
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
-void init_logger()
+inline void init_logger()
 {
     auto file_sink = std::make_shared<spdlog::sinks::rotating_file_sink_mt>(
         "/var/log/standard_assignment2/main.log", 10 * 1024 * 1024, 5
