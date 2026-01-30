@@ -16,6 +16,8 @@
 #include "json/json_codec.hpp"
 #include "network/tcp/tcp_thread.hpp"
 
+#include "camera/v4l2_capture.hpp"
+
 /**
  * @class JsonProtocolClient
  * @brief TCP通信とJSON変換をラップし、コマンド・データの送受信を行うクラス
@@ -24,6 +26,22 @@
 class JsonClient
 {
     public:
+        enum class cmd_kinds {
+            CHANGE_FORMAT,
+            SHUTDOWN,
+            UNKNOWN
+        };
+
+        enum class args_kinds : std::uint32_t {
+            NONE = 0,
+            MJPEG = static_cast<std::uint32_t>(V4L2Capture::frame_format::MJPEG),
+            YUV422 = static_cast<std::uint32_t>(V4L2Capture::frame_format::YUV422)
+        };
+        struct recv_cmd_data {
+            cmd_kinds cmd;
+            args_kinds args;
+        };
+
         JsonClient(const std::string& hostname, std::uint16_t port);
         ~JsonClient();
     
@@ -53,7 +71,7 @@ class JsonClient
          * @brief パケットの受信（ノンブロッキング）
          * @return 受信データがあればVariantを返す。なければ std::nullopt
          */
-        std::optional<JsonCodec::PacketVariant> try_receive();
+        std::optional<recv_cmd_data> try_receive();
     
     private:
         /**
@@ -65,6 +83,11 @@ class JsonClient
          * @brief バイナリ配列を文字列に変換
          */
         std::string bytes_to_string(const std::vector<std::uint8_t>& bytes) const;
+
+        /**
+         * @brief json_strからrecv_cmd_dataへの変換
+         */
+        std::optional<recv_cmd_data> json_str_to_recv_cmd_data(std::string json_str);
     
         TcpThread tcp_thread_;
 };

@@ -14,6 +14,43 @@
 #include "json/json_client.hpp"
 #include "logger/logger.hpp"
 
+namespace {
+    struct CmdConverter
+    {
+        using ResultType = std::optional<JsonClient::recv_cmd_data>;
+    
+        ResultType operator()(const type_cmd_json& cmd_json) const
+        {
+            JsonClient::recv_cmd_data result = { JsonClient::cmd_kinds::UNKNOWN, JsonClient::args_kinds::NONE };
+    
+            if (cmd_json.command == "change_format") {
+                result.cmd = JsonClient::cmd_kinds::CHANGE_FORMAT;
+    
+                if (std::holds_alternative<Change_format_args>(cmd_json.args)) {
+                    auto args = std::get<Change_format_args>(cmd_json.args);
+                    
+                    if (args.format == "MJPEG") {
+                        result.args = JsonClient::args_kinds::MJPEG;
+                    } else if (args.format == "YUV422") {
+                        result.args = JsonClient::args_kinds::YUV422;
+                    }
+                }
+                return result;
+            } else if (cmd_json.command == "shutdown") {
+                result.cmd = JsonClient::cmd_kinds::SHUTDOWN;
+                return result;
+            }
+    
+            return std::nullopt;
+        }
+    
+        ResultType operator()(const type_data_json&) const
+        {
+            return std::nullopt;
+        }
+    };
+}
+
 JsonClient::JsonClient(const std::string& hostname, std::uint16_t port)
     : tcp_thread_(hostname, port)
 {
@@ -65,7 +102,7 @@ void JsonClient::send_data(const type_data_json& data)
     }
 }
 
-std::optional<JsonCodec::PacketVariant> JsonClient::try_receive()
+std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
 {
     if (!tcp_thread_.has_received_data()) {
         return std::nullopt;
@@ -77,16 +114,9 @@ std::optional<JsonCodec::PacketVariant> JsonClient::try_receive()
             return std::nullopt;
         }
 
-        std::string jsonStr = bytes_to_string(recvBytes);
+        std::string json_str = bytes_to_string(recvBytes);
 
-        try {
-            return JsonCodec::parse(jsonStr);
-        }
-        catch (const std::exception& e) {
-            spdlog::error("JsonClient: Parse Error: {}", e.what());
-
-            return std::nullopt;
-        }
+        return json_str_to_recv_cmd_data(json_str);
     }
 
     return std::nullopt;
@@ -113,4 +143,17 @@ std::vector<std::uint8_t> JsonClient::add_header_and_bytes(const std::string& st
 std::string JsonClient::bytes_to_string(const std::vector<std::uint8_t>& bytes) const
 {
     return std::string(bytes.begin(), bytes.end());
+}
+
+std::optional<JsonClient::recv_cmd_data> JsonClient::json_str_to_recv_cmd_data(std::string json_str)
+{
+    try {
+        auto packet_variant = JsonCodec::parse(json_str);
+
+        return std::visit(CmdConverter{}, packet_variant);
+    }
+    catch (const std::exception& e) {
+        spdlog::error("JsonClient: Parse or Convert Error: {}", e.what());
+        return std::nullopt;
+    }
 }

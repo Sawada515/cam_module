@@ -43,6 +43,7 @@ int main()
 {
     // TcpThreadではなく、ラッパークラスであるJsonClientを使用
     JsonClient client("gui-module-rpi5.local", 55555);
+    //JsonClient client("localhost", 55555);
     client.start();
 
     std::uint32_t counter = 0;
@@ -65,36 +66,52 @@ int main()
             det2.value = std::nullopt; // 読み取れなかった場合
             det2.inference_result = { 300.0f, 400.0f, 60.0f, 30.0f, -0.2f };
 
+            detection_data det3;
+            det2.detection_id = 2;
+            det2.value = std::nullopt; // 読み取れなかった場合
+            det2.inference_result = { 1300.0f, 4200.0f, 160.0f, 90.0f, -0.1115f };
+
+            detection_data det4;
+            det2.detection_id = 2;
+            det2.value = std::nullopt; // 読み取れなかった場合
+            det2.inference_result = { 30000.0f, 1400.0f, 610.0f, 40.0f, -0.55551f };
+
             data_packet.detections.push_back(det1);
             data_packet.detections.push_back(det2);
+            data_packet.detections.push_back(det3);
+            data_packet.detections.push_back(det4);
 
-            // 3. 送信 (シリアライズとヘッダ付与は内部で行われる)
             client.send_data(data_packet);
 
             std::cout << "[SEND] Data Frame: " << data_packet.frame_id << std::endl;
         }
 
-        /* ---------- 送信テスト (Command - 5回に1回送る例) ---------- */
-        if (counter % 5 == 0) {
-            type_cmd_json cmd_packet;
-            cmd_packet.command = "change_format";
-            cmd_packet.args = Change_format_args{ "MJPEG" };
-
-            client.send_command(cmd_packet);
-            std::cout << "[SEND] Command: change_format" << std::endl;
-        }
-
-        /* ---------- 受信テスト ---------- */
-        // ノンブロッキングで受信キューを確認
         while (true) {
-            auto packet_opt = client.try_receive();
+            std::optional<JsonClient::recv_cmd_data> recv_json_opt = client.try_receive();
             
-            if (!packet_opt.has_value()) {
+            if (!recv_json_opt.has_value()) {
                 break;
             }
 
-            // 受信データがあれば std::visit で型ごとに処理
-            std::visit(PacketVisitor{}, packet_opt.value());
+            JsonClient::recv_cmd_data recv_data = recv_json_opt.value();
+
+            if (recv_data.cmd == JsonClient::cmd_kinds::CHANGE_FORMAT) {
+                if (recv_data.args == JsonClient::args_kinds::MJPEG) {
+                    std::cout << "recv cmd change_format args MJPG" << std::endl;
+                }
+                else if (recv_data.args == JsonClient::args_kinds::YUV422) {
+                    std::cout << "recv cmd change_format args YUV422" << std::endl;
+                }
+                else {
+                    std::cout << "recv cmd change_format args None" << std::endl;
+                }
+            }
+            else if (recv_data.cmd == JsonClient::cmd_kinds::SHUTDOWN) {
+                std::cout << "recv cmd shutdown" << std::endl;
+            }
+            else {
+                std::cout << "Unknown command" << std::endl;
+            }
         }
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
