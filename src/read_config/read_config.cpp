@@ -27,6 +27,8 @@ ReadConfig::ReadConfig()
     config_data_.camera.default_fmt = V4L2Capture::frame_format::MJPEG;
 
     config_data_.image_processor.jpeg_quality = 80;
+
+    config_data_.python.venv_path = "/home/sawada/python/venv/";
 }
 
 bool ReadConfig::load_config(const std::string& config_file_path)
@@ -87,6 +89,19 @@ bool ReadConfig::load_config(const std::string& config_file_path)
             }
 
             config_data_.image_processor.jpeg_quality = static_cast<std::uint8_t>(quality);
+        }
+
+        if (!config["python"]) {
+            throw std::runtime_error("python section missing");
+        }
+        {
+            const auto py = config["python"];
+
+            if (!py["venv_path"]) {
+                throw std::runtime_error("venv_path section missing required keys");
+            }
+
+            config_data_.python.venv_path = py["venv_path"].as<std::uint16_t>();
         }
     }
     catch (const YAML::BadFile& e) {

@@ -8,18 +8,28 @@
 #ifndef READ_RESISTOR_VALUE_HPP_
 #define READ_RESISTOR_VALUE_HPP_
 
-#include <opencv2/opencv.hpp>
+#include <opencv2/core/mat.hpp>
 
 #include <string>
 #include <optional>
 #include <memory>
 
+/**
+ * @class ReadResistorValue
+ * @brief 抵抗値を画像処理で推測する
+ */
 class ReadResistorValue {
     public:
         ReadResistorValue(const std::string& band_model_path, const std::string& color_model_path);
         ~ReadResistorValue();
 
-        ReadResistorValue& operator=(const ReadResistorValue&);
+        //copyの禁止
+        ReadResistorValue(const ReadResistorValue&) = delete;
+        ReadResistorValue& operator=(const ReadResistorValue&) = delete;
+
+        //moveのみ許可
+        ReadResistorValue(ReadResistorValue&&) noexcept;
+        ReadResistorValue& operator=(ReadResistorValue&&) noexcept;
 
         std::optional<double> inference(const cv::Mat& resistor_roi);
     

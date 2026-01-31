@@ -15,3 +15,8 @@ camera:
 image_processor:
   # 0 - 100
   jpeg_quality: 90
+
+python:
+  # ex /home/$USER/python/venv/bin/python3
+  venv_path: "/home/sawada/python/venv/bin/python3"
+

@@ -30,6 +30,10 @@ struct app_config_data_t {
     struct image_processor {
         std::uint8_t jpeg_quality;
     } image_processor;
+
+    struct python {
+        std::string venv_path;
+    } python;
 };
 
 /**
