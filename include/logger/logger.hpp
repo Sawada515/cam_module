@@ -5,6 +5,9 @@
  * @date 2026-01-24
  */
 
+#ifndef LOGGER_HPP_
+#define LOGGER_HPP_
+
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -21,3 +24,5 @@ inline void init_logger()
     spdlog::set_default_logger(std::make_shared<spdlog::logger>(logger));
     spdlog::set_level(spdlog::level::info);
 }
+
+#endif

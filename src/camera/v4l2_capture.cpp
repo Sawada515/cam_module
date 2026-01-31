@@ -102,7 +102,7 @@ bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
     if (ret == 0) {
         frame.size = 0;
 
-        return;
+        return false;
     }
     else if (ret < 0) {
         throw std::system_error(errno, std::generic_category(), "poll failed");
@@ -126,11 +126,7 @@ bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
     size_t data_size = buf.bytesused;
 
     if (data_size > frame.data.size()) {
-        xioctl(device_fd_, VIDIOC_QBUF, &buf);
-
-        frame.size = 0;
-
-        throw std::out_of_range("buffer overflow protection");
+        frame.data.resize(data_size);
     }
 
     std::memcpy(frame.data.data(), start_ptr, data_size);
@@ -145,6 +141,8 @@ bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
     if (xioctl(device_fd_, VIDIOC_QBUF, &buf) < 0) {
         throw std::system_error(errno, std::generic_category(), "VIDIOC_QBUF failed");
     }
+
+    return true;
 }
 
 void V4L2Capture::stream_on()
@@ -170,6 +168,10 @@ void V4L2Capture::reconfigure(frame_format fmt)
 
     bool is_pass_fmt_check;
 
+    stream_off();
+
+    //usleep(1000 * 10);
+
     for (int i = 0; i < MAX_RETRY; ++i) {
         is_pass_fmt_check = try_format(width_, height_, static_cast<std::uint32_t>(fmt));
 
@@ -182,6 +184,8 @@ void V4L2Capture::reconfigure(frame_format fmt)
     }
 
     if(!is_pass_fmt_check) {
+        stream_on();
+
         throw std::runtime_error("not supprted fmt");
     }
 
@@ -291,29 +295,54 @@ void V4L2Capture::cleanup_buffers()
     }
 
     buffers_.clear();
+
+    v4l2_requestbuffers req{};
+    req.count = 0;
+    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    req.memory = V4L2_MEMORY_MMAP;
+
+    if (xioctl(device_fd_, VIDIOC_REQBUFS, &req) < 0) {
+        spdlog::warn("cleanup_buffers: REQBUFS(0) failed. errno={}", errno);
+    }
 }
 
 bool V4L2Capture::try_format(std::uint16_t width, std::uint16_t height, uint32_t pixfmt)
 {
-    v4l2_format original{};
-    original.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    v4l2_format fmt{}; 
+    fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+    
+    fmt.fmt.pix.width = width;
+    fmt.fmt.pix.height = height;
+    fmt.fmt.pix.pixelformat = pixfmt;
+    fmt.fmt.pix.field = V4L2_FIELD_ANY; // ドライバに任せる
 
-    if (xioctl(device_fd_, VIDIOC_G_FMT, &original) < 0) {
+    if (xioctl(device_fd_, VIDIOC_TRY_FMT, &fmt) < 0) {
+        spdlog::warn("try_format: ioctl failed. errno={}", errno);
         return false;
     }
 
-    v4l2_format trial = original;
-    trial.fmt.pix.pixelformat = pixfmt;
-    trial.fmt.pix.width = width;
-    trial.fmt.pix.height = height;
+    bool match_fmt = (fmt.fmt.pix.pixelformat == pixfmt);
+    bool match_w   = (fmt.fmt.pix.width == width);
+    bool match_h   = (fmt.fmt.pix.height == height);
 
-    if (xioctl(device_fd_, VIDIOC_S_FMT, &trial) < 0) {
+    if (!match_fmt || !match_w || !match_h) {
+        /*
+        auto fcc_str = [](uint32_t fcc) {
+            std::string s;
+            s += static_cast<char>(fcc & 0xFF);
+            s += static_cast<char>((fcc >> 8) & 0xFF);
+            s += static_cast<char>((fcc >> 16) & 0xFF);
+            s += static_cast<char>((fcc >> 24) & 0xFF);
+            return s;
+        };
+
+        spdlog::warn("try_format mismatch: Req[{} {}x{}] -> Res[{} {}x{}]",
+            fcc_str(pixfmt), width, height,
+            fcc_str(fmt.fmt.pix.pixelformat), fmt.fmt.pix.width, fmt.fmt.pix.height);
+        */
+            
         return false;
     }
 
-    bool accepted = (trial.fmt.pix.pixelformat == pixfmt && trial.fmt.pix.width == width && trial.fmt.pix.height == height);
-
-    xioctl(device_fd_, VIDIOC_S_FMT, &original);
-
-    return accepted;
+    return true;
 }

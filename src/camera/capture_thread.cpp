@@ -152,8 +152,6 @@ void CaptureThread::change_format(std::optional<V4L2Capture>& camera, V4L2Captur
             camera.emplace(device_file_name_, width_, height_, reqest_fmt);
         }
 
-        camera->stream_on();
-
         current_fmt_ = reqest_fmt;
     }
     catch (const std::exception& e) {
