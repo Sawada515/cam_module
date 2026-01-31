@@ -165,14 +165,18 @@ class InferenceResistorValue:
         clipped_roi = clip_resistor_roi(cast(NDArray[np.uint8], resistor_roi))
         if clipped_roi is None:
             return None
+
+        filtered_roi = apply_bilateral_filter(clipped_roi)
+        if filtered_roi is None:
+            return None
             
-        w = clipped_roi.shape[1]
+        w = filtered_roi.shape[1]
     
-        specular_mask = create_specular_mask(cast(NDArray[np.uint8], clipped_roi))
+        specular_mask = create_specular_mask(cast(NDArray[np.uint8], filtered_roi))
         if specular_mask is None:
             return None
     
-        lab_segment, valid_pixels_ratio = select_best_segment(cast(NDArray[np.uint8], clipped_roi), specular_mask)
+        lab_segment, valid_pixels_ratio = select_best_segment(cast(NDArray[np.uint8], filtered_roi), specular_mask)
         if lab_segment is None:
             return None
     
@@ -293,6 +297,11 @@ def clip_resistor_roi(roi: NDArray[np.uint8] | None) -> NDArray[np.uint8] | None
 
     return roi[trim_h : h-trim_h, trim_w : w-trim_w]
 
+def apply_bilateral_filter(roi: NDArray[np.uint8] | None) -> NDArray[np.uint8] | None:
+    if roi is None:
+        return None
+
+    return cast(NDArray[np.uint8], cv2.bilateralFilter(roi, d=9, sigmaColor=75, sigmaSpace=75))
 
 def create_specular_mask(
     clipped_roi: NDArray[np.uint8] | None
