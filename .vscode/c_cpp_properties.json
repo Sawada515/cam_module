@@ -6,13 +6,14 @@
                 "${workspaceFolder}/**",
                 "${workspaceFolder}/include/logger",
                 "${workspaceFolder}/include",
-                "/usr/include/opencv4"
+                "/usr/include/opencv4",
+                "/usr/include/python3.13"
             ],
             "defines": [],
-            "compilerPath": "/usr/bin/clang",
+            "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "linux-clang-x64"
+            "cppStandard": "gnu++20",
+            "intelliSenseMode": "linux-gcc-x64"
         }
     ],
     "version": 4

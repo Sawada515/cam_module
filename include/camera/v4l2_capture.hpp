@@ -44,6 +44,8 @@ class V4L2Capture {
             
             size_t size;
 
+            std::uint32_t bytesperline;
+
             frame_format fmt;
 
             std::vector<std::uint8_t> data;
@@ -86,6 +88,8 @@ class V4L2Capture {
 
         std::uint16_t width_;
         std::uint16_t height_;
+
+        std::uint32_t bytesperline_;
 
         frame_format fmt_;
 

@@ -136,6 +136,8 @@ bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
 
     frame.size = data_size;
 
+    frame.bytesperline = bytesperline_;
+
     frame.fmt = fmt_;
 
     if (xioctl(device_fd_, VIDIOC_QBUF, &buf) < 0) {
@@ -167,8 +169,6 @@ void V4L2Capture::reconfigure(frame_format fmt)
     constexpr int DELAY_US = 5000;
 
     bool is_pass_fmt_check;
-
-    stream_off();
 
     //usleep(1000 * 10);
 
@@ -284,6 +284,8 @@ void V4L2Capture::set_frame_format()
     if (height_ != fmt.fmt.pix.height) {
         height_ = fmt.fmt.pix.height;
     }
+
+    bytesperline_ = fmt.fmt.pix.bytesperline;
 }
 
 void V4L2Capture::cleanup_buffers()

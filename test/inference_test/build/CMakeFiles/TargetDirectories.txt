@@ -1,0 +1,3 @@
+/home/sawada/cpp/standard_assignment2/test/inference_test/build/CMakeFiles/test_image_processor.dir
+/home/sawada/cpp/standard_assignment2/test/inference_test/build/CMakeFiles/edit_cache.dir
+/home/sawada/cpp/standard_assignment2/test/inference_test/build/CMakeFiles/rebuild_cache.dir

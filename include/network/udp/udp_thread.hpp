@@ -34,8 +34,7 @@ public:
     void start();
     void stop();
 
-    bool send(const void* header, size_t header_len,
-              const void* payload, size_t payload_len);
+    bool send(const void* header, size_t header_len, const void* payload, size_t payload_len);
 
 private:
     struct SendItem {

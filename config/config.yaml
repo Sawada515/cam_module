@@ -19,4 +19,6 @@ image_processor:
 python:
   # ex /home/$USER/python/venv/bin/python3
   venv_path: "/home/sawada/python/venv/bin/python3"
+  # ex /home/$USER/cam_module/src/inference/
+  script_path: "/home/sawada/cpp/standard_assignment2/src/inference"
 

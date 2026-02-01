@@ -29,6 +29,7 @@ ReadConfig::ReadConfig()
     config_data_.image_processor.jpeg_quality = 80;
 
     config_data_.python.venv_path = "/home/sawada/python/venv/";
+    config_data_.python.script_path = "/home/sawada/cpp/standard_assignment2/src/inference";
 }
 
 bool ReadConfig::load_config(const std::string& config_file_path)
@@ -97,11 +98,13 @@ bool ReadConfig::load_config(const std::string& config_file_path)
         {
             const auto py = config["python"];
 
-            if (!py["venv_path"]) {
+            if (!py["venv_path"] || !py["script_path"]) {
                 throw std::runtime_error("venv_path section missing required keys");
             }
 
-            config_data_.python.venv_path = py["venv_path"].as<std::uint16_t>();
+            config_data_.python.venv_path = py["venv_path"].as<std::string>();
+
+            config_data_.python.script_path = py["script_path"].as<std::string>();
         }
     }
     catch (const YAML::BadFile& e) {

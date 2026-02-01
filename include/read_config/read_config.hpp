@@ -33,6 +33,8 @@ struct app_config_data_t {
 
     struct python {
         std::string venv_path;
+        
+        std::string script_path;
     } python;
 };
 

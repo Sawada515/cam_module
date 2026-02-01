@@ -14,6 +14,8 @@
 #include <optional>
 #include <memory>
 
+void initialize_python_runtime(const std::string& vevn_path, const std::string& script_dir);
+
 /**
  * @class ReadResistorValue
  * @brief 抵抗値を画像処理で推測する
