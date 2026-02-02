@@ -312,8 +312,6 @@ void ImageProcessor::correction_roi_angle(const cv::Mat& bgr_data, cv::Mat& roi,
 {
     const auto& obb = detect_data.inference_result;
 
-    // 1. RotatedRectを作成して4点の頂点を取得
-    // (PythonではYOLOの結果から直接ptsを取得していましたが、C++では構造体から復元します)
     float angle_deg = obb.rotation_rad * (180.0f / CV_PI);
     cv::RotatedRect rect(
         cv::Point2f(obb.center_x, obb.center_y),
@@ -322,22 +320,17 @@ void ImageProcessor::correction_roi_angle(const cv::Mat& bgr_data, cv::Mat& roi,
     );
 
     cv::Point2f pts[4];
-    rect.points(pts); // 矩形の4頂点を取得
+    rect.points(pts);
 
-    // 2. 座標の並び替え (Pythonの order_points 関数相当)
-    // 左上(tl), 右上(tr), 右下(br), 左下(bl) を特定します
     cv::Point2f tl, tr, br, bl;
 
-    // 初期化
     float min_s = std::numeric_limits<float>::max();
     float max_s = std::numeric_limits<float>::lowest();
     float min_diff = std::numeric_limits<float>::max();
     float max_diff = std::numeric_limits<float>::lowest();
 
     for (int i = 0; i < 4; i++) {
-        // Python: s = pts.sum(axis=1) -> x + y
         float s = pts[i].x + pts[i].y;
-        // Python: diff = np.diff(pts, axis=1) -> col[1] - col[0] -> y - x
         float diff = pts[i].y - pts[i].x;
 
         // 左上(tl): s が最小
@@ -362,22 +355,18 @@ void ImageProcessor::correction_roi_angle(const cv::Mat& bgr_data, cv::Mat& roi,
         }
     }
 
-    // 3. 幅と高さの最大値を計算 (Pythonの four_point_transform 内の計算)
     auto euclidean_dist = [](cv::Point2f p1, cv::Point2f p2) {
         return std::sqrt(std::pow(p1.x - p2.x, 2) + std::pow(p1.y - p2.y, 2));
     };
 
-    // 幅の計算
     float widthA = euclidean_dist(br, bl);
     float widthB = euclidean_dist(tr, tl);
     int maxWidth = std::max(static_cast<int>(widthA), static_cast<int>(widthB));
 
-    // 高さの計算
     float heightA = euclidean_dist(tr, br);
     float heightB = euclidean_dist(tl, bl);
     int maxHeight = std::max(static_cast<int>(heightA), static_cast<int>(heightB));
 
-    // 変換先の座標 (0,0 から maxWidth, maxHeight へのマッピング)
     std::vector<cv::Point2f> src_pts = {tl, tr, br, bl};
     std::vector<cv::Point2f> dst_pts = {
         cv::Point2f(0, 0),
@@ -386,12 +375,9 @@ void ImageProcessor::correction_roi_angle(const cv::Mat& bgr_data, cv::Mat& roi,
         cv::Point2f(0, maxHeight - 1)
     };
 
-    // 4. 透視変換行列の計算と適用
     cv::Mat M = cv::getPerspectiveTransform(src_pts, dst_pts);
     cv::warpPerspective(bgr_data, roi, M, cv::Size(maxWidth, maxHeight));
 
-    // 5. 向きの最終調整
-    // Pythonコードの最後にあった「縦長なら90度回転」する処理
     if (!roi.empty() && roi.rows > roi.cols) {
         cv::rotate(roi, roi, cv::ROTATE_90_CLOCKWISE);
     }

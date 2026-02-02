@@ -67,9 +67,9 @@ UdpSocket& UdpSocket::operator=(UdpSocket&& other) noexcept
     return *this;
 }
 
-ssize_t UdpSocket::send_iovec(const struct iovec* iov, int iovcnt) noexcept
+ssize_t UdpSocket::send_iovec(const struct iovec* iov, size_t iov_size) noexcept
 {
-    if (!iov || iovcnt <= 0) {
+    if (!iov || iov_size <= 0) {
         errno = EINVAL;
         return -1;
     }
@@ -78,7 +78,7 @@ ssize_t UdpSocket::send_iovec(const struct iovec* iov, int iovcnt) noexcept
     msg.msg_name    = &addr_;
     msg.msg_namelen = sizeof(addr_);
     msg.msg_iov     = const_cast<struct iovec*>(iov);
-    msg.msg_iovlen  = static_cast<size_t>(iovcnt);
+    msg.msg_iovlen  = iov_size;
 
     return ::sendmsg(sock_fd_, &msg, 0);
 }
