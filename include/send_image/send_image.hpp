@@ -103,6 +103,18 @@ class SendImage
         std::atomic<bool> running_{false};
     
         bool is_created_thread_{false};
+
+        std::vector<std::uint8_t> front_jpeg_data_;
+        std::vector<std::uint8_t> back_jpeg_data_;
+
+        std::uint32_t identifier_;
+
+        std::uint16_t packet_index_;
+        std::uint16_t total_packet_;
+
+        std::uint8_t back_header_[IMAGE_HEADER_SIZE];
+        std::uint8_t front_header_[IMAGE_HEADER_SIZE];
 };
 
 #endif
+       
