@@ -17,8 +17,8 @@ image_processor:
   jpeg_quality: 90
 
 python:
-  # ex /home/$USER/python/venv/bin/python3
-  venv_path: "/home/sawada/python/venv/bin/python3"
+  # ex /home/$USER/python/venv/
+  venv_path: "/home/sawada/python/venv/"
   # ex /home/$USER/cam_module/src/inference/
-  script_path: "/home/sawada/cpp/standard_assignment2/src/inference"
+  script_path: "./src/inference"
 

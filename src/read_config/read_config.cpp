@@ -29,7 +29,7 @@ ReadConfig::ReadConfig()
     config_data_.image_processor.jpeg_quality = 80;
 
     config_data_.python.venv_path = "/home/sawada/python/venv/";
-    config_data_.python.script_path = "/home/sawada/cpp/standard_assignment2/src/inference";
+    config_data_.python.script_path = "./src/inference";
 }
 
 bool ReadConfig::load_config(const std::string& config_file_path)
