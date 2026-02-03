@@ -19,7 +19,6 @@
 
 #include "network/udp/udp_socket.hpp"
 
-
 /**
  * @brief UDPで画像を送信
  * @details 内部でヘッダを付与
@@ -53,6 +52,9 @@ class SendImage
          * @ref IMAGE_PACKET_HEADER_ANCHOR
          */
         static constexpr size_t IMAGE_HEADER_SIZE = 15;
+        /**
+         * @details 予備 7byte
+         */
         static constexpr size_t PADDING_SIZE = 7;
         /**
          * @details NAX_UDP_PAYLOAD_SIZE - image_header(15byte) - padding(7byte)
@@ -80,15 +82,29 @@ class SendImage
          * 14 | uint8_t | 1 | channels
          */
 
-        enum class buffer_state {
+        enum class buffer_state_t {
             EMPTY,
             FRONT_ONLY,
             FRONT_AND_BACK
         };
 
+        static constexpr std::uint8_t OFFSET_IDENTIFIER = 0;
+        static constexpr std::uint8_t OFFSET_PACKET_INDEX = 4;
+        static constexpr std::uint8_t OFFSET_TOTAL_PACKET = 6;
+        static constexpr std::uint8_t OFFSET_DATA_SIZE = 8;
+        static constexpr std::uint8_t OFFSET_WIDTH = 10;
+        static constexpr std::uint8_t OFFSET_HEIGHT = 12;
+        static constexpr std::uint8_t OFFSET_CHANNELS = 14;
+
         void thread_loop();
     
         bool resolve_and_create_socket();
+
+        void write_header_data_info_feilds(std::uint8_t* h, std::uint16_t width, std::uint16_t height, std::uint8_t ch);
+
+        void write_header_data_other_info(std::uint8_t* h, std::uint32_t identifier, std::uint16_t packet_index, std::uint16_t total_packet, std::uint16_t data_size);
+
+        void try_reconnect_and_recreate_socket();
     
         std::string hostname_;
         std::uint16_t port_;
@@ -104,13 +120,12 @@ class SendImage
     
         bool is_created_thread_{false};
 
+        enum buffer_state_t buffer_state_;
+
         std::vector<std::uint8_t> front_jpeg_data_;
         std::vector<std::uint8_t> back_jpeg_data_;
 
         std::uint32_t identifier_;
-
-        std::uint16_t packet_index_;
-        std::uint16_t total_packet_;
 
         std::uint8_t back_header_[IMAGE_HEADER_SIZE];
         std::uint8_t front_header_[IMAGE_HEADER_SIZE];

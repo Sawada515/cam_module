@@ -21,24 +21,25 @@
 
 UdpSocket::UdpSocket(const std::string& ip_addr, std::uint16_t port)
     : sock_fd_(-1)
+    , ip_addr_(ip_addr)
+    , port_(port)
 {
     sock_fd_ = ::socket(AF_INET, SOCK_DGRAM, 0);
     if (sock_fd_ < 0) {
         throw std::runtime_error("Failed to create socket");
     }
 
-
     std::memset(&addr_, 0, sizeof(addr_));
 
     addr_.sin_family = AF_INET;
-    addr_.sin_port = htons(port);
+    addr_.sin_port = htons(port_);
 
-    if (inet_pton(AF_INET, ip_addr.c_str(), &addr_.sin_addr) <= 0) {
+    if (inet_pton(AF_INET, ip_addr_.c_str(), &addr_.sin_addr) <= 0) {
         ::close(sock_fd_);
 
         sock_fd_ = -1;
 
-        throw std::runtime_error(std::string("Invalid IP address") + ip_addr);
+        throw std::runtime_error(std::string("Invalid IP address") + ip_addr_);
     }
 
     int send_buf_size = 1024 * 1024;

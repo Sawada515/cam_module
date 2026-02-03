@@ -42,6 +42,10 @@ class UdpSocket {
         int sock_fd_ = -1;
 
         struct sockaddr_in addr_{};
+
+        std::string ip_addr_;
+
+        int port_;
 };
 
 #endif

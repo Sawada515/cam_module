@@ -381,10 +381,4 @@ void ImageProcessor::correction_roi_angle(const cv::Mat& bgr_data, cv::Mat& roi,
     if (!roi.empty() && roi.rows > roi.cols) {
         cv::rotate(roi, roi, cv::ROTATE_90_CLOCKWISE);
     }
-
-    if (!roi.empty()) {
-        cv::imwrite("debug.bmp", roi);
-
-        spdlog::info("save debug image");
-    }
 }
