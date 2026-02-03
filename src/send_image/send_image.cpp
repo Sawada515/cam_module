@@ -21,7 +21,6 @@
 
 #include "network/resolve_hostname.hpp"
 
-
 SendImage::SendImage(std::string hostname, std::uint16_t port)
     : hostname_(std::move(hostname))
     , port_(port)
@@ -78,7 +77,7 @@ bool SendImage::set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16
 
         std::uint8_t* h = front_header_;
 
-        write_header_data_info_feilds(h, width, height, channels);
+        write_header_data_info_fields(h, width, height, channels);
 
         buffer_state_ = buffer_state_t::FRONT_ONLY;
 
@@ -91,9 +90,11 @@ bool SendImage::set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16
 
         std::uint8_t* h = back_header_;
 
-        write_header_data_info_feilds(h, width, height, channels);
+        write_header_data_info_fields(h, width, height, channels);
 
         buffer_state_ = buffer_state_t::FRONT_AND_BACK;
+
+        cv_.notify_one();
     }
     else if (buffer_state_ == SendImage::buffer_state_t::FRONT_AND_BACK) {
         back_jpeg_data_ = std::move(jpeg_data);
@@ -102,7 +103,7 @@ bool SendImage::set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16
 
         std::uint8_t* h = back_header_;
 
-        write_header_data_info_feilds(h, width, height, channels);
+        write_header_data_info_fields(h, width, height, channels);
     }
     else {
         spdlog::warn("Unknown buffer type");
@@ -145,18 +146,33 @@ void SendImage::thread_loop()
 
                 struct iovec iov[2];
                 iov[0].iov_base = front_header_;
-                iov[0].iov_len = sizeof(front_header_);
+                iov[0].iov_len = IMAGE_HEADER_SIZE;
                 iov[1].iov_base = front_jpeg_data_.data() + offset;
                 iov[1].iov_len = chunk_size;
 
-                if (socket_) {
-                    socket_->send_iovec(iov, 2);
+                int ret = -1;
+
+                {
+                    std::lock_guard<std::mutex> lock(mtx_);                   
+
+                    if (socket_) {
+                        ret = socket_->send_iovec(iov, 2);
+                    }
                 }
 
-                int err = errno;
+                if (ret < 0 || !socket_) {
+                    int err = errno;
+    
+                    if (err != EAGAIN && err != EWOULDBLOCK) {
+                        try {
+                            recreate_socket();
+                        }
+                        catch (const std::exception &e) {
+                            spdlog::error("Failed to recreate udp socket : {}", e.what());
+                        }
 
-                if (err == EPIPE || err == ECONNRESET || err == ENOTCONN) {
-                    try_reconnect_and_recreate_socket();
+                        break;     //送信失敗した場合はフレームを捨てる
+                    }
                 }
             }
         }
@@ -174,7 +190,7 @@ void SendImage::thread_loop()
             if (buffer_state_ == SendImage::buffer_state_t::FRONT_AND_BACK) {
                 std::swap(front_jpeg_data_, back_jpeg_data_);
 
-                std::memcpy(front_header_, back_header_, sizeof(front_header_));
+                std::memcpy(front_header_, back_header_, IMAGE_HEADER_SIZE);
 
                 back_jpeg_data_.clear();
 
@@ -205,8 +221,7 @@ bool SendImage::resolve_and_create_socket()
     }
 }
 
-
-void SendImage::write_header_data_info_feilds(std::uint8_t* h, std::uint16_t width, std::uint16_t height, std::uint8_t ch)
+void SendImage::write_header_data_info_fields(std::uint8_t* h, std::uint16_t width, std::uint16_t height, std::uint8_t ch)
 {
     static_assert(OFFSET_WIDTH + sizeof(std::uint16_t) <= IMAGE_HEADER_SIZE);
     static_assert(OFFSET_HEIGHT + sizeof(std::uint16_t) <= IMAGE_HEADER_SIZE);
@@ -238,49 +253,30 @@ void SendImage::write_header_data_other_info(std::uint8_t* h, std::uint32_t iden
     std::memcpy(h + OFFSET_DATA_SIZE, &data_size, sizeof(data_size));
 }
 
-void SendImage::try_reconnect_and_recreate_socket()
+void SendImage::recreate_socket()
 {
-    int retry_count = 0;
-
-    bool reconnected = false;
-
-    constexpr std::uint8_t HURRY_RETRY_COUNT_MAX = 5;
-    
-    constexpr std::uint8_t HURRY_RETRY_WAIT_TIME_MS = 100;
-    constexpr std::uint8_t NORMARY_RETRY_WAIT_IIMEM_MS = 1000;
-
     {
         std::lock_guard<std::mutex> lock(mtx_);
 
         socket_.reset();
     }
 
-    while(running_ && !reconnected) {
-        retry_count += 1;
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        auto wait_duration = (retry_count <= HURRY_RETRY_COUNT_MAX) \
-            ? std::chrono::milliseconds(HURRY_RETRY_WAIT_TIME_MS) \
-            : std::chrono::seconds(NORMARY_RETRY_WAIT_IIMEM_MS / 1000);
-        
-        std::this_thread::sleep_for(wait_duration);
+    std::unique_ptr<UdpSocket> new_socket = nullptr;
 
-        std::unique_ptr<UdpSocket> new_socket = nullptr;
+    try {
+        std::string ip = resolve_mdns_ipv4(hostname_);
 
-        try {
-            std::string ip = resolve_mdns_ipv4(hostname_);
+        new_socket = std::make_unique<UdpSocket>(ip, port_);
+    }
+    catch(...) {
+        throw;
+    }
 
-            new_socket = std::make_unique<UdpSocket>(ip, port_);
-        }
-        catch(...) {
-            new_socket = nullptr;
-        }
+    if (new_socket) {
+        std::lock_guard<std::mutex> lock(mtx_);
 
-        if (new_socket) {
-            std::lock_guard<std::mutex> lock(mtx_);
-
-            socket_ = std::move(new_socket);
-
-            reconnected = true;
-        }
+        socket_ = std::move(new_socket);
     }
 }

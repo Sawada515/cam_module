@@ -100,11 +100,11 @@ class SendImage
     
         bool resolve_and_create_socket();
 
-        void write_header_data_info_feilds(std::uint8_t* h, std::uint16_t width, std::uint16_t height, std::uint8_t ch);
+        void write_header_data_info_fields(std::uint8_t* h, std::uint16_t width, std::uint16_t height, std::uint8_t ch);
 
         void write_header_data_other_info(std::uint8_t* h, std::uint32_t identifier, std::uint16_t packet_index, std::uint16_t total_packet, std::uint16_t data_size);
 
-        void try_reconnect_and_recreate_socket();
+        void recreate_socket();
     
         std::string hostname_;
         std::uint16_t port_;
