@@ -20,7 +20,6 @@
 #include "json/json_client.hpp"
 #include "logger/logger.hpp"
 #include "read_config/read_config.hpp"
-#include "read_resistor_value/read_resistor_value.hpp"
 #include "send_image/send_image.hpp"
 
 std::atomic<bool> g_is_running(true);
