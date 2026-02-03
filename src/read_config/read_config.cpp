@@ -27,6 +27,9 @@ ReadConfig::ReadConfig()
     config_data_.camera.default_fmt = V4L2Capture::frame_format::MJPEG;
 
     config_data_.image_processor.jpeg_quality = 80;
+    config_data_.image_processor.onnx_model_path = "./model/best.onnx";
+    config_data_.image_processor.band_model_path = "./model/band_classifier_rf.pkl";
+    config_data_.image_processor.color_model_path = "./model/resistor_color_rf_merged.pkl";
 
     config_data_.python.venv_path = "/home/sawada/python/venv/";
     config_data_.python.script_path = "./src/inference";
@@ -79,7 +82,7 @@ bool ReadConfig::load_config(const std::string& config_file_path)
         {
             const auto img = config["image_processor"];
 
-            if (!img["jpeg_quality"]) {
+            if (!img["jpeg_quality"] || !img["onnx_model_path"] || !img["band_model_path"] || !img["color_model_path"]) {
                 throw std::runtime_error("image_processor section missing required keys");
             }
 
@@ -90,6 +93,10 @@ bool ReadConfig::load_config(const std::string& config_file_path)
             }
 
             config_data_.image_processor.jpeg_quality = static_cast<std::uint8_t>(quality);
+
+            config_data_.image_processor.onnx_model_path = img["onnx_model_path"].as<std::string>();
+            config_data_.image_processor.band_model_path = img["band_model_path"].as<std::string>();
+            config_data_.image_processor.color_model_path = img["color_model_path"].as<std::string>();
         }
 
         if (!config["python"]) {

@@ -29,6 +29,10 @@ struct app_config_data_t {
 
     struct image_processor {
         std::uint8_t jpeg_quality;
+
+        std::string onnx_model_path;
+        std::string band_model_path;
+        std::string color_model_path;
     } image_processor;
 
     struct python {
