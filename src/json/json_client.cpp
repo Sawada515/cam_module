@@ -38,6 +38,7 @@ namespace {
                 return result;
             } else if (cmd_json.command == "shutdown") {
                 result.cmd = JsonClient::cmd_kinds::SHUTDOWN;
+
                 return result;
             }
     

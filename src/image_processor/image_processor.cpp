@@ -61,6 +61,8 @@ struct ImageProcessor::Impl {
         }
         catch (const cv::Exception& e) {
             spdlog::error("Failed to model load error {}", e.what());
+
+            throw;
         }
 
         try {
@@ -68,11 +70,15 @@ struct ImageProcessor::Impl {
         }
         catch (const std::exception& e) {
             spdlog::error("Failed to initialize ReadResistorValue {}", e.what());
+
+            throw;
         }
 
         jpeg_compressor = tjInitCompress();
         if (!jpeg_compressor) {
             spdlog::error("Failed to Turbojpeg init");
+
+            throw std::runtime_error("Failed to init turbojpeg");
         }
     }
 
