@@ -6,6 +6,7 @@
  */
 
 #include <cstring>
+#include <cstdlib>
 #include <stdexcept>
 #include <limits>
 #include <algorithm>
@@ -21,6 +22,8 @@
 
 #include "network/resolve_hostname.hpp"
 
+constexpr int MAX_TRY_COUNT = 5;
+
 SendImage::SendImage(std::string hostname, std::uint16_t port)
     : hostname_(std::move(hostname))
     , port_(port)
@@ -29,8 +32,18 @@ SendImage::SendImage(std::string hostname, std::uint16_t port)
     , buffer_state_(SendImage::buffer_state_t::EMPTY)
     , identifier_(0)
 {
-    if (!resolve_and_create_socket()) {
-        throw std::runtime_error("Failed to create socket");
+    while (!resolve_and_create_socket()) {
+        int try_count = 0;
+
+        spdlog::error("Failed to create socket");
+
+        if (++try_count >= MAX_TRY_COUNT) {
+            spdlog::critical("Can not resolve hostname or Failed to create socket");
+
+            exit(EXIT_FAILURE);
+        }
+
+        usleep(1000 * 100);
     }
 }
 
