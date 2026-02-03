@@ -18,20 +18,18 @@
 #include "read_resistor_value/read_resistor_value.hpp"
 #include "send_image/send_image.hpp"
 
-// 定数定義
 constexpr int FRAME_WIDTH = 1280;
 constexpr int FRAME_HEIGHT = 960;
 constexpr char DEVICE_NAME[] = "/dev/video0";
 
 // UDP送信設定
-const std::string UDP_TARGET_HOSTNAME = "localhost"; // 受信側のホスト名を設定
+const std::string UDP_TARGET_HOSTNAME = "Ubuntu.local";
 constexpr std::uint16_t UDP_TARGET_PORT = 50000;
 
 const std::string ONNX_MODEL_PATH = "models/best.onnx";
 const std::string BAND_MODEL_PATH = "models/band_classifier_rf.pkl";
 const std::string COLOR_MODEL_PATH = "models/resistor_color_rf_merged.pkl";
 
-// Ctrl+C で安全に終了するためのフラグ
 std::atomic<bool> g_is_running(true);
 
 void signal_handler(int signum)
@@ -41,14 +39,12 @@ void signal_handler(int signum)
 
 int main()
 {
-    // シグナルハンドラの設定
     std::signal(SIGINT, signal_handler);
 
-    initialize_python_runtime("/home/shikoku-pc/python/venv/", "./src/inference/");
+    initialize_python_runtime("/home/sawada/python/venv/", "./src/inference/");
 
     std::cout << "Initializing ImageProcessor Test (UDP Sender Mode)..." << std::endl;
 
-    // カメラ初期化
     V4L2Capture::frame_format current_fmt = V4L2Capture::frame_format::MJPEG;
     CaptureThread capture(
         DEVICE_NAME,
@@ -60,11 +56,9 @@ int main()
     V4L2Capture::Frame frame_buffer;
     capture.create_empty_frame(frame_buffer);
 
-    // 画像処理クラス初期化
     std::cout << "Loading models..." << std::endl;
     ImageProcessor processor(ONNX_MODEL_PATH, BAND_MODEL_PATH, COLOR_MODEL_PATH);
 
-    // UDP送信クラス初期化
     std::cout << "Initializing UDP Sender..." << std::endl;
     SendImage sender(UDP_TARGET_HOSTNAME, UDP_TARGET_PORT);
     sender.create_thread();
@@ -101,7 +95,6 @@ int main()
 
                 results.clear();
 
-                // 検出と描画
                 bool detected = processor.detect_resistor_coordinate(display_image, results);
 
                 if (detected) {
@@ -125,11 +118,10 @@ int main()
                     }
                 }
 
-                // UDP送信処理
                 if (!display_image.empty()) {
-                    // 推論結果(枠線など)が描画された画像をJPEGにエンコード
                     jpeg_buffer.clear();
-                    cv::imencode(".jpg", display_image, jpeg_buffer, encode_params);
+
+                    processor.jpeg_compression_bgr_data(display_image, jpeg_buffer, 90);
 
                     // 送信キューに追加 (std::moveで所有権移動)
                     sender.set_send_data(

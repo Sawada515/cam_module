@@ -146,7 +146,7 @@ static py::array_t<uint8_t> mat_to_numpy(const cv::Mat& src)
     return py::array_t<uint8_t>(shape, strides, src.data).attr("copy")();
 }
 
-struct ReadResistorValue::Impl {
+struct __attribute__((visibility("hidden"))) ReadResistorValue::Impl {
     py::object py_instance;
 
     Impl(const std::string& band_path, const std::string& color_path) {
