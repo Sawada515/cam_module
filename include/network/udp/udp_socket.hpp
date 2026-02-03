@@ -35,7 +35,7 @@ class UdpSocket {
          * @details 戻り値を確認
          * @return -1 : errnoの確認, 0以上 送信済みバイト数
          */
-        ssize_t UdpSocket::send_iovec(const struct iovec* iov, size_t iov_size) noexcept;
+        ssize_t send_iovec(const struct iovec* iov, size_t iov_size) noexcept;
 
         int get_fd() const noexcept;
     private:

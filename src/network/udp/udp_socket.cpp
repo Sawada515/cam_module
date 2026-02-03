@@ -48,6 +48,13 @@ UdpSocket::UdpSocket(const std::string& ip_addr, std::uint16_t port)
     }
 }
 
+UdpSocket::~UdpSocket()
+{
+    if (sock_fd_ >= 0) {
+        ::close(sock_fd_);
+    }
+}
+
 UdpSocket::UdpSocket(UdpSocket&& other) noexcept
 {
     sock_fd_ = other.sock_fd_;
