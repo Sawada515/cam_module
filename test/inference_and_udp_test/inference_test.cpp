@@ -44,7 +44,7 @@ int main()
     // シグナルハンドラの設定
     std::signal(SIGINT, signal_handler);
 
-    initialize_python_runtime("/home/marugame/python/venv/", "./src/inference/");
+    initialize_python_runtime("/home/shikoku-pc/python/venv/", "./src/inference/");
 
     std::cout << "Initializing ImageProcessor Test (UDP Sender Mode)..." << std::endl;
 
