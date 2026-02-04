@@ -35,16 +35,6 @@ find_package(Threads REQUIRED)
 #yaml-cpp
 find_package(yaml-cpp REQUIRED)
 
-add_executable(${PROJECT_NAME} ${SOURCE_FILES})
-
-target_include_directories(${PROJECT_NAME} PRIVATE
-    ${CMAKE_SOURCE_DIR}/include
-    ${OpenCV_INCLUDE_DIRS}
-    ${TURBOJPEG_INCLUDE_DIRS}
-    ${pybind11_INCLUDE_DIRS}
-    ${Python3_INCLUDE_DIRS}
-)
-
 set(SOURCE_FILES
     src/main.cpp
     src/camera/v4l2_capture.cpp
@@ -59,6 +49,16 @@ set(SOURCE_FILES
     src/read_config/read_config.cpp
     src/read_resistor_value/read_resistor_value.cpp
     src/send_image/send_image.cpp
+)
+
+add_executable(${PROJECT_NAME} ${SOURCE_FILES})
+
+target_include_directories(${PROJECT_NAME} PRIVATE
+    ${CMAKE_SOURCE_DIR}/include
+    ${OpenCV_INCLUDE_DIRS}
+    ${TURBOJPEG_INCLUDE_DIRS}
+    ${pybind11_INCLUDE_DIRS}
+    ${Python3_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PROJECT_NAME}
