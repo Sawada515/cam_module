@@ -140,6 +140,8 @@ int main()
                     detect_results
                 };
 
+                spdlog::error("data send?");
+
                 json_client.send_data(send_data);
 
                 camera.request_change_format(V4L2Capture::frame_format::MJPEG);

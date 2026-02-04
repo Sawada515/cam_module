@@ -64,6 +64,8 @@ void TcpThread::send(std::vector<std::uint8_t> data)
         return;
     }
 
+    spdlog::error("send?");
+
     std::lock_guard<std::mutex> lock(mtx_);
 
     thread_send_queue_.push_back(std::move(data));
