@@ -6,6 +6,7 @@
  */
 
 #include <opencv2/opencv.hpp>
+#include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
 
 #include <turbojpeg.h>
@@ -106,14 +107,30 @@ void ImageProcessor::convert_raw_to_bgr(const raw_image_t& frame, cv::Mat& bgr_d
         return;
     }
 
-    cv::Mat raw_data(1, frame.data.size(), CV_8UC1, const_cast<unsigned char*>(frame.data.data()));
+    /**
+     * @details const_cast<uint8_t*> : OpenCV cv::Mat requires non-const data pointer.
+     */
 
     if (frame.fmt == pixel_format::MJPEG) {
-        cv::imdecode(raw_data, cv::IMREAD_COLOR, &bgr_data);
+        cv::Mat raw(
+            1,
+            static_cast<int>(frame.data.size()),
+            CV_8UC1,
+            const_cast<uint8_t*>(frame.data.data())
+        );
+
+        cv::imdecode(raw, cv::IMREAD_COLOR, &bgr_data);
     } 
     else if (frame.fmt == pixel_format::YUV422) {
-        cv::Mat raw_wrapper(frame.height, frame.width, CV_8UC2, raw_data.data);
-        cv::cvtColor(raw_wrapper, bgr_data, cv::COLOR_YUV2BGR_YUYV);
+        cv::Mat raw(
+            static_cast<int>(frame.height),
+            static_cast<int>(frame.width),
+            CV_8UC2,
+            const_cast<uint8_t*>(frame.data.data()),
+            static_cast<size_t>(frame.bytesperline)
+        );
+
+        cv::cvtColor(raw, bgr_data, cv::COLOR_YUV2BGR_YUYV);
     }
 }
 

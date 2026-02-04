@@ -16,10 +16,10 @@ image_processor:
   # 0 - 100
   jpeg_quality: 90
 
-  onnx_model_path: "./model/best.onnx"
-  band_model_path: "./model/band_classifier_rf.pkl"
-  color_model_path: "./model/resistor_color_rf_merged.pkl"
-
+  onnx_model_path: "./models/best.onnx"
+  band_model_path: "./models/band_classifier_rf.pkl"
+  color_model_path: "./models/resistor_color_rf_merged.pkl"
+  
 python:
   # ex /home/$USER/python/venv/
   venv_path: "/home/shikoku-pc/python/venv/"
