@@ -60,12 +60,14 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${TURBOJPEG_INCLUDE_DIRS}
     ${pybind11_INCLUDE_DIRS}
     ${Python3_INCLUDE_DIRS}
+    ${YAML_CPP_INCLUDE_DIRS}
 )
 
 target_link_libraries(${PROJECT_NAME}
     PRIVATE
     ${OpenCV_LIBS}
     ${TURBOJPEG_LIBRARIES}
+    ${YAML_CPP_LIBRARIES}
     pybind11::embed
     Python3::Python
     spdlog::spdlog
