@@ -34,6 +34,7 @@ find_package(Threads REQUIRED)
 
 #yaml-cpp
 find_package(yaml-cpp REQUIRED)
+pkg_check_modules(YAML_CPP REQUIRED yaml-cpp)
 
 set(SOURCE_FILES
     src/main.cpp
