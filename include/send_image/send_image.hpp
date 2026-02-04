@@ -40,7 +40,7 @@ class SendImage
         /**
          * @details dataはstd::moveで渡す
          */
-        bool set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16_t width, std::uint16_t height, std::uint8_t channels);
+        bool set_send_data(std::vector<std::uint8_t>& jpeg_data, std::uint16_t width, std::uint16_t height, std::uint8_t channels);
 
     private:
         /**

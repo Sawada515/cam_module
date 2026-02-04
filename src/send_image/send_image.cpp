@@ -75,7 +75,7 @@ void SendImage::create_thread()
     is_created_thread_ = true;
 }
 
-bool SendImage::set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16_t width, std::uint16_t height, std::uint8_t channels)
+bool SendImage::set_send_data(std::vector<std::uint8_t>& jpeg_data, std::uint16_t width, std::uint16_t height, std::uint8_t channels)
 {
     if (!is_created_thread_) {
         return false;
@@ -84,7 +84,7 @@ bool SendImage::set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16
     std::lock_guard<std::mutex> lock(mtx_);
 
     if (buffer_state_ == SendImage::buffer_state_t::EMPTY) {
-        front_jpeg_data_ = std::move(jpeg_data);
+        front_jpeg_data_ = jpeg_data;
 
         std::memset(front_header_, 0, IMAGE_HEADER_SIZE);
 
@@ -97,7 +97,7 @@ bool SendImage::set_send_data(std::vector<std::uint8_t>&& jpeg_data, std::uint16
         cv_.notify_one();
     }
     else if (buffer_state_ == SendImage::buffer_state_t::FRONT_ONLY) {
-        back_jpeg_data_ = std::move(jpeg_data);
+        back_jpeg_data_ = jpeg_data;
 
         std::memset(back_header_, 0, IMAGE_HEADER_SIZE);
 
