@@ -35,7 +35,7 @@ find_package(Threads REQUIRED)
 #yaml-cpp
 find_package(yaml-cpp REQUIRED)
 
-target_include_directories(
+target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/include
     ${OpenCV_INCLUDE_DIRS}
     ${TURBOJPEG_INCLUDE_DIRS}
@@ -62,7 +62,7 @@ set(SOURCE_FILES
 
 add_executable(${PROJECT_NAME} ${SOURCE_FILES})
 
-target_link_libraries(
+target_link_libraries(${PROJECT_NAME}
     PRIVATE
     ${OpenCV_LIBS}
     ${TURBOJPEG_LIBRARIES}
