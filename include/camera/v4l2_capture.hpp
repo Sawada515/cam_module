@@ -109,6 +109,11 @@ class V4L2Capture {
         void cleanup_buffers();
 
         bool try_format(std::uint16_t width, std::uint16_t height, uint32_t pixfmt);
+
+        /**
+         * @details 白飛び対策としてフォーマット変更直後数フレーム捨てる
+         */
+        void drop_frame(int drop_frame_num);
 };
 
 #endif

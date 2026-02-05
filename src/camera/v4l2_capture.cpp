@@ -184,8 +184,6 @@ void V4L2Capture::reconfigure(frame_format fmt)
     }
 
     if(!is_pass_fmt_check) {
-        stream_on();
-
         throw std::runtime_error("not supprted fmt");
     }
 
@@ -200,6 +198,10 @@ void V4L2Capture::reconfigure(frame_format fmt)
     request_capture_buffer();
 
     stream_on();
+
+    constexpr int DROP_FRAM_NUM = 30;
+
+    drop_frame(DROP_FRAM_NUM);
 }
 
 int V4L2Capture::open_device()
@@ -347,4 +349,31 @@ bool V4L2Capture::try_format(std::uint16_t width, std::uint16_t height, uint32_t
     }
 
     return true;
+}
+
+void V4L2Capture::drop_frame(int drop_frame_num)
+{
+    for (int i = 0; i < drop_frame_num; ++i) {
+        v4l2_buffer buf{};
+
+        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        buf.memory = V4L2_MEMORY_MMAP;
+
+        pollfd poll_fd;
+
+        poll_fd.fd = device_fd_;
+        poll_fd.events = POLLIN;
+
+        if (xpoll(&poll_fd, 1, 1000) <= 0) {
+            break;
+        }
+
+        if (xioctl(device_fd_, VIDIOC_DQBUF, &buf) < 0) {
+            break;
+        }
+
+        if (xioctl(device_fd_, VIDIOC_QBUF, &buf) < 0) {
+            break;
+        }
+    }
 }
