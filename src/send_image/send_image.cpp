@@ -165,15 +165,13 @@ void SendImage::thread_loop()
 
                 int ret = -1;
 
-                {
-                    std::lock_guard<std::mutex> lock(mtx_);                   
-
-                    if (socket_) {
-                        ret = socket_->send_iovec(iov, 2);
-                    }
+                if (socket_) {
+                    ret = socket_->send_iovec(iov, 2);
                 }
 
-                if (ret < 0 || !socket_) {
+                if (ret < 0) {
+                    spdlog::error("image send failed");
+
                     int err = errno;
     
                     if (err != EAGAIN && err != EWOULDBLOCK) {
@@ -187,6 +185,8 @@ void SendImage::thread_loop()
                         break;     //送信失敗した場合はフレームを捨てる
                     }
                 }
+
+                std::this_thread::sleep_for(std::chrono::microseconds(10));
             }
         }
 
@@ -283,7 +283,9 @@ void SendImage::recreate_socket()
 
         new_socket = std::make_unique<UdpSocket>(ip, port_);
     }
-    catch(...) {
+    catch(std::exception& e) {
+        spdlog::error("can not resolve hostname");
+
         throw;
     }
 

@@ -26,6 +26,8 @@
 #include "read_resistor_value/read_resistor_value.hpp"
 #include "send_image/send_image.hpp"
 
+#include <iostream>
+
 std::atomic<bool> g_is_running(true);
 
 constexpr const char* CONFIG_FILE = "./config/config.yaml";
@@ -55,6 +57,8 @@ int main()
     V4L2Capture::Frame frame_buffer;
     camera.create_empty_frame(frame_buffer);
 
+    std::cout << "finish init\n";
+
     json_client.start();
     send_image.create_thread();
 
@@ -72,7 +76,10 @@ int main()
     bool is_inference_and_send_json = false;
     int send_json_frame_id = 0;
 
+    std::cout << "start\n";
+
     while(g_is_running.load()) {
+        std::cerr << "1\n";
         std::optional<JsonClient::recv_cmd_data> recv_json_data = json_client.try_receive();
         if (recv_json_data.has_value()) {
             JsonClient::recv_cmd_data recv_data = recv_json_data.value();
@@ -102,12 +109,20 @@ int main()
                 spdlog::warn("Unknown command");
             }
         }
+        std::cerr << "2\n";
 
         if(!camera.get_latest_frame(frame_buffer)) {
             continue;
+
+            std::cerr << "get frame err\n";
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
+        std::cerr << "3\n";
 
         if (frame_buffer.size > 0) {
+            spdlog::info("get frame OK");
+
             ImageProcessor::raw_image_t  raw_image{
                 frame_buffer.width,
                 frame_buffer.height,
@@ -152,6 +167,7 @@ int main()
             jpeg_buffer.clear();
 
             if(image_processor.jpeg_compression_bgr_data(bgr_mat, jpeg_buffer, config.image_processor.jpeg_quality)) {
+                spdlog::info("send image data ok");
                 send_image.set_send_data(
                     jpeg_buffer,
                     static_cast<std::uint16_t>(bgr_mat.cols),

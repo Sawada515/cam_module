@@ -1,6 +1,6 @@
 network:
   #接続先のホスト名を指定
-  dest_hostname: "gui-module-rpi5.local"
+  dest_hostname: "debian.local"
   tcp_json_port: 55555
   udp_send_image_port: 50000
 
@@ -22,6 +22,6 @@ image_processor:
   
 python:
   # ex /home/$USER/python/venv/
-  venv_path: "/home/shikoku-pc/python/venv/"
+  venv_path: "/home/sawada/python/venv/"
   # ex /home/$USER/cam_module/src/inference/
   script_path: "./src/inference"

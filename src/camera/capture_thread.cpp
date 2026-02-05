@@ -123,6 +123,7 @@ void CaptureThread::thread_loop()
             }
 
             if(!camera->capture_frame(back_frame)) {
+                spdlog::info("capture frame OK");
                 continue;
             }
 

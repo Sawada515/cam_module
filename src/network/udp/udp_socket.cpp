@@ -46,6 +46,8 @@ UdpSocket::UdpSocket(const std::string& ip_addr, std::uint16_t port)
     if (::setsockopt(sock_fd_, SOL_SOCKET, SO_SNDBUF, &send_buf_size, sizeof(send_buf_size)) < 0) {
         spdlog::warn("Failed to optimize send buffer");
     }
+
+    spdlog::info("UDP socket OK");
 }
 
 UdpSocket::~UdpSocket()

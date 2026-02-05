@@ -274,7 +274,8 @@ void V4L2Capture::set_frame_format()
 
     fmt.fmt.pix.pixelformat = static_cast<std::uint32_t>(fmt_);
 
-    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+    //fmt.fmt.pix.field = V4L2_FIELD_NONE;
+    fmt.fmt.pix.field = V4L2_FIELD_ANY;
 
     if (xioctl(device_fd_, VIDIOC_S_FMT, &fmt) < 0) {
         throw std::system_error(errno, std::generic_category(), "invalid format");
@@ -286,6 +287,8 @@ void V4L2Capture::set_frame_format()
     if (height_ != fmt.fmt.pix.height) {
         height_ = fmt.fmt.pix.height;
     }
+
+    spdlog::info("set format {}x{}", width_, height_);
 
     bytesperline_ = fmt.fmt.pix.bytesperline;
 }
