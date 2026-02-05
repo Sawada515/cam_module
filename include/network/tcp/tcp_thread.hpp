@@ -51,13 +51,11 @@ public:
     /**
      * @brief 受信データの受け取り
      */
-    bool recv(std::vector<std::uint8_t>& out);
+    bool fetch_recv_data(std::vector<std::uint8_t>& out);
 
 private:
     void thread_loop();
     bool resolve_and_connect();
-
-    void process_receive_buffer();
 
     std::string hostname_;
     std::uint16_t port_;
@@ -69,8 +67,6 @@ private:
 
     mutable std::mutex mtx_;
     std::condition_variable cv_;
-
-    std::deque<std::vector<std::uint8_t>> recv_queue_;
 
     std::deque<std::vector<std::uint8_t>> thread_send_queue_;
 

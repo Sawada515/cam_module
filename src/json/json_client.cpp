@@ -52,9 +52,16 @@ namespace {
     };
 }
 
+namespace {
+    constexpr size_t RECV_BUFFER_DEFAULT_SIZE = 2048;
+
+    constexpr size_t HEADER_SIZE = 4;
+}
+
 JsonClient::JsonClient(const std::string& hostname, std::uint16_t port)
     : tcp_thread_(hostname, port)
 {
+    recv_buffer_.resize(RECV_BUFFER_DEFAULT_SIZE);
 }
 
 JsonClient::~JsonClient()
@@ -109,13 +116,29 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
         return std::nullopt;
     }
 
-    std::vector<std::uint8_t> recvBytes;
-    if (tcp_thread_.recv(recvBytes)) {
-        if (recvBytes.empty()) {
+    if (tcp_thread_.fetch_recv_data(recv_buffer_)) {
+        if (recv_buffer_.empty()) {
+            return std::nullopt;
+        }
+        
+        if (recv_buffer_.size() < HEADER_SIZE) {
             return std::nullopt;
         }
 
-        std::string json_str = bytes_to_string(recvBytes);
+        std::uint32_t network_order_byte_length = 0;
+        std::memcpy(&network_order_byte_length, recv_buffer_.data(), HEADER_SIZE);
+
+        std::uint32_t body_length = ntohl(network_order_byte_length);
+
+        const std::uint32_t total_packet_size = body_length + HEADER_SIZE;
+
+        do {
+            tcp_thread_.fetch_recv_data(recv_buffer_);
+        } while (total_packet_size < recv_buffer_.size());
+
+        std::string json_str(recv_buffer_.begin() + HEADER_SIZE, recv_buffer_.begin() + total_packet_size);
+
+        recv_buffer_.clear();
 
         return json_str_to_recv_cmd_data(json_str);
     }
@@ -125,7 +148,6 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
 
 std::vector<std::uint8_t> JsonClient::add_header_and_bytes(const std::string& str) const
 {
-    constexpr size_t HEADER_SIZE = 4;
     std::uint32_t body_len = static_cast<std::uint32_t>(str.size());
 
     std::vector<std::uint8_t> buffer;
@@ -139,11 +161,6 @@ std::vector<std::uint8_t> JsonClient::add_header_and_bytes(const std::string& st
     buffer.insert(buffer.end(), str.begin(), str.end());
 
     return buffer;
-}
-
-std::string JsonClient::bytes_to_string(const std::vector<std::uint8_t>& bytes) const
-{
-    return std::string(bytes.begin(), bytes.end());
 }
 
 std::optional<JsonClient::recv_cmd_data> JsonClient::json_str_to_recv_cmd_data(std::string json_str)

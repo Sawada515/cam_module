@@ -18,11 +18,16 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 
+namespace {
+    constexpr size_t RECV_BUFFER_DEFAULT_SIZE = 2048;
+}
+
 TcpThread::TcpThread(std::string hostname, std::uint16_t port)
     : hostname_(std::move(hostname))
     , port_(port)
     , running_(false)
 {
+    recv_buffer_.resize(RECV_BUFFER_DEFAULT_SIZE);
 }
 
 TcpThread::~TcpThread()
@@ -54,7 +59,7 @@ void TcpThread::stop()
     }
 
     std::lock_guard<std::mutex> lock(mtx_);
-    recv_queue_.clear();
+    recv_buffer_.clear();
     socket_.reset();
 }
 
@@ -74,19 +79,27 @@ void TcpThread::send(std::vector<std::uint8_t> data)
 bool TcpThread::has_received_data() const
 {
     std::lock_guard<std::mutex> lock(mtx_);
-    return !recv_queue_.empty();
+
+    return !recv_buffer_.empty();
 }
 
-bool TcpThread::recv(std::vector<std::uint8_t>& out)
+bool TcpThread::fetch_recv_data(std::vector<std::uint8_t>& out)
 {
     std::lock_guard<std::mutex> lock(mtx_);
 
-    if (recv_queue_.empty()) {
+    if (recv_buffer_.empty()) {
         return false;
     }
 
-    out = std::move(recv_queue_.front());
-    recv_queue_.pop_front();
+    if (out.empty()) {
+        std::swap(out, recv_buffer_);
+    }
+    else {
+        out.insert(out.end(), recv_buffer_.begin(), recv_buffer_.end());
+
+        recv_buffer_.clear();
+    }
+
     return true;
 }
 
@@ -96,6 +109,7 @@ void TcpThread::thread_loop()
         if (!socket_ || !socket_->is_connected()) {
             if (!resolve_and_connect()) {
                 std::this_thread::sleep_for(std::chrono::seconds(1));
+
                 continue;
             }
 
@@ -109,6 +123,7 @@ void TcpThread::thread_loop()
                 if (socket_) {
                     socket_->enqueue_data(std::move(thread_send_queue_.front()));
                 }
+
                 thread_send_queue_.pop_front();
             }
         }
@@ -133,16 +148,20 @@ void TcpThread::thread_loop()
         socket_->handle_poll(pfd.revents);
 
         if (pfd.revents & POLLIN) {
-            std::uint8_t buf[4096];
-            ssize_t len;
+            std::uint8_t buf[2048];
+            ssize_t recv_length;
 
-            while (true) {
-                auto st = socket_->try_recv(buf, sizeof(buf), len);
+            while (1) {
+                TcpSocket::recv_state state = socket_->try_recv(buf, sizeof(buf), recv_length);
                 
-                if (st == TcpSocket::recv_state::DATA_RECEIVED) {
-                        recv_buffer_.insert(recv_buffer_.end(), buf, buf + len);
+                if (state == TcpSocket::recv_state::DATA_RECEIVED && recv_length > 0) {
+                    {
+                        std::lock_guard<std::mutex> lock(mtx_);
+
+                        recv_buffer_.insert(recv_buffer_.end(), buf, buf + recv_length);
+                    }
                 }
-                else if (st == TcpSocket::recv_state::CLOSED) {
+                else if (state == TcpSocket::recv_state::CLOSED) {
                     spdlog::warn("TcpThread: Connection closed by peer");
 
                     socket_.reset();
@@ -153,43 +172,31 @@ void TcpThread::thread_loop()
                     break;
                 }
             }
-            
-            process_receive_buffer();
         }
 
         if ((pfd.revents & POLLOUT) && socket_ && socket_->is_connected()) {
-            socket_->send_enqueued_data();
+            TcpSocket::send_state state;
+
+            while (1) {
+                state = socket_->send_enqueued_data();
+
+                if (state == TcpSocket::send_state::TRY_LATER) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(25));
+
+                    continue;
+                }
+                else if (state == TcpSocket::send_state::CLOSED || state == TcpSocket::send_state::ERROR) {
+                    spdlog::warn("TcpThread; Connectin closed");
+
+                    socket_.reset();
+
+                    break;
+                }
+                else {
+                    break;
+                }
+            }
         }
-    }
-}
-
-void TcpThread::process_receive_buffer()
-{
-    constexpr size_t HEADER_SIZE = 4;
-
-    while (recv_buffer_.size() >= HEADER_SIZE) {
-        std::uint32_t body_len = 0;
-        std::memcpy(&body_len, recv_buffer_.data(), HEADER_SIZE);
-        body_len = ntohl(body_len);
-
-        if (recv_buffer_.size() < HEADER_SIZE + body_len) {
-            break;
-        }
-
-        std::vector<std::uint8_t> packet(
-            recv_buffer_.begin() + HEADER_SIZE,
-            recv_buffer_.begin() + HEADER_SIZE + body_len
-        );
-
-        {
-            std::lock_guard<std::mutex> lock(mtx_);
-            recv_queue_.push_back(std::move(packet));
-        }
-
-        recv_buffer_.erase(
-            recv_buffer_.begin(),
-            recv_buffer_.begin() + HEADER_SIZE + body_len
-        );
     }
 }
 

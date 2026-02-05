@@ -80,16 +80,13 @@ class JsonClient
         std::vector<std::uint8_t> add_header_and_bytes(const std::string& str) const;
     
         /**
-         * @brief バイナリ配列を文字列に変換
-         */
-        std::string bytes_to_string(const std::vector<std::uint8_t>& bytes) const;
-
-        /**
          * @brief json_strからrecv_cmd_dataへの変換
          */
         std::optional<recv_cmd_data> json_str_to_recv_cmd_data(std::string json_str);
     
         TcpThread tcp_thread_;
+
+        std::vector<std::uint8_t> recv_buffer_;
 };
 
 #endif

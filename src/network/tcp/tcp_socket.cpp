@@ -305,6 +305,7 @@ TcpSocket::send_state TcpSocket::send_enqueued_data()
     msg.msg_iovlen = iov_cnt;
 
     ssize_t sent_bytes;
+
     do {
         sent_bytes = ::sendmsg(sock_fd_, &msg, MSG_NOSIGNAL);
     } while (sent_bytes < 0 && errno == EINTR);
