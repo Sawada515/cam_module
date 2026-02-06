@@ -1,0 +1,11 @@
+[Unit]
+    Description=cam_module daemon
+
+[Service]
+    ExecStart=/root/start_script.sh
+    Restart=always
+    RestartSec=5s
+    Type=simple
+
+[Install]
+    WantedBy=multi-user.target
