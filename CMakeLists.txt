@@ -6,11 +6,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
-    add_compile_options(-O3)
-elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
-    add_compile_options(-mfpu=neon -mfloat-abi=hard -O3)
-endif()
+#if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64|arm64)")
+#    add_compile_options(-O3)
+#elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^arm")
+#    add_compile_options(-mfpu=neon -mfloat-abi=hard -O3)
+#endif()
 
 #python3
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)

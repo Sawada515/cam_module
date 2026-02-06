@@ -8,6 +8,7 @@
 #include <opencv2/opencv.hpp>
 #include <opencv2/core.hpp>
 #include <opencv2/dnn.hpp>
+#include <opencv2/core/utils/logger.hpp>
 
 #include <turbojpeg.h>
 
@@ -93,7 +94,10 @@ struct ImageProcessor::Impl {
 ImageProcessor::ImageProcessor(const std::string& onnx_model_path, const std::string& band_model_path, const std::string& color_model_path)
     : pImpl(std::make_unique<Impl>(onnx_model_path, band_model_path, color_model_path)) 
 {
-    ;
+    /**
+     * @details カメラ側の問題でMJPEGのデータが壊れている
+     */
+    cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);
 }
 
 ImageProcessor::~ImageProcessor() = default;
@@ -114,7 +118,7 @@ void ImageProcessor::convert_raw_to_bgr(const raw_image_t& frame, cv::Mat& bgr_d
     if (frame.fmt == pixel_format::MJPEG) {
         cv::Mat raw(
             1,
-            static_cast<int>(frame.data.size()),
+            static_cast<int>(frame.valid_size),
             CV_8UC1,
             const_cast<uint8_t*>(frame.data.data())
         );
@@ -245,6 +249,8 @@ bool ImageProcessor::detect_resistor_coordinate(const cv::Mat& bgr_data, std::ve
 
 void ImageProcessor::draw_surround_box(cv::Mat& bgr_data, const std::vector<detection_data>& detected_data, const cv::Scalar& color)
 {
+    int id = 1;;
+
     for (const auto& det : detected_data) {
         float angle_deg = det.inference_result.rotation_rad * (180.0f / CV_PI);
         cv::RotatedRect rect(
@@ -255,9 +261,22 @@ void ImageProcessor::draw_surround_box(cv::Mat& bgr_data, const std::vector<dete
 
         cv::Point2f vertices[4];
         rect.points(vertices);
+
+        cv::Point2f text_pos = vertices[0];
+
         for (int i = 0; i < 4; i++) {
             cv::line(bgr_data, vertices[i], vertices[(i + 1) % 4], color, 2);
+
+            if (vertices[i].y < text_pos.y) {
+                text_pos = vertices[i];
+            }
         }
+
+        text_pos.y -= 5;
+
+        std::string label = "R" + std::to_string(id++);
+
+        cv::putText(bgr_data, label, text_pos, cv::FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv::LINE_AA);
     }
 }
 

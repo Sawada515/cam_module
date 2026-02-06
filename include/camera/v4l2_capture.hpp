@@ -37,12 +37,13 @@ class V4L2Capture {
          * @struct Frame
          * @brief フレームデータ保持用
          * @details データはYUV422のサイズを基準に作成しておく
+         * @details data.size()は信用せずvalid_sizeを見る
          */
         struct Frame {
             std::uint16_t width;
             std::uint16_t height;
             
-            size_t size;
+            size_t valid_size;
 
             std::uint32_t bytesperline;
 
@@ -114,6 +115,11 @@ class V4L2Capture {
          * @details 白飛び対策としてフォーマット変更直後数フレーム捨てる
          */
         void drop_frame(int drop_frame_num);
+
+        /**
+         * @details mjpegのSOI, EOIを除去
+         */
+        void store_clean_mjpeg(Frame& frame, const uint8_t *buf_ptr, size_t buf_size);
 };
 
 #endif

@@ -37,6 +37,8 @@ class ImageProcessor {
 
             uint32_t bytesperline;
 
+            size_t valid_size;
+
             std::span<const uint8_t> data;
         };
 

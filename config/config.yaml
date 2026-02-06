@@ -1,6 +1,6 @@
 network:
   #接続先のホスト名を指定
-  dest_hostname: "debian.local"
+  dest_hostname: "gui-module-rpi5.local"
   tcp_json_port: 55555
   udp_send_image_port: 50000
 
@@ -14,7 +14,7 @@ camera:
 
 image_processor:
   # 0 - 100
-  jpeg_quality: 90
+  jpeg_quality: 50
 
   onnx_model_path: "./models/best.onnx"
   band_model_path: "./models/band_classifier_rf.pkl"
@@ -22,6 +22,6 @@ image_processor:
   
 python:
   # ex /home/$USER/python/venv/
-  venv_path: "/home/sawada/python/venv/"
+  venv_path: "/home/shikoku-pc/python/venv/"
   # ex /home/$USER/cam_module/src/inference/
   script_path: "./src/inference"

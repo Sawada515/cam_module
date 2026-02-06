@@ -47,7 +47,7 @@ void CaptureThread::create_empty_frame(V4L2Capture::Frame& frame)
     frame.height = height_;
     frame.fmt = current_fmt_;
 
-    frame.size = 0;
+    frame.valid_size = 0;
 
     if (frame.data.size() < require_buffer_size_) {
         frame.data.resize(require_buffer_size_);
@@ -65,7 +65,7 @@ bool CaptureThread::get_latest_frame(V4L2Capture::Frame& frame)
 {
     std::lock_guard<std::mutex> lock(frame_mtx_);
 
-    if (!has_new_frame_ || latest_frame_.size == 0) {
+    if (!has_new_frame_ || latest_frame_.valid_size == 0) {
         return false;
     }
 
@@ -123,7 +123,6 @@ void CaptureThread::thread_loop()
             }
 
             if(!camera->capture_frame(back_frame)) {
-                spdlog::info("capture frame OK");
                 continue;
             }
 

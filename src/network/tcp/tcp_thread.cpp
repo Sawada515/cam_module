@@ -69,8 +69,6 @@ void TcpThread::send(std::vector<std::uint8_t> data)
         return;
     }
 
-    spdlog::error("send?");
-
     std::lock_guard<std::mutex> lock(mtx_);
 
     thread_send_queue_.push_back(std::move(data));
@@ -95,6 +93,8 @@ bool TcpThread::fetch_recv_data(std::vector<std::uint8_t>& out)
         std::swap(out, recv_buffer_);
     }
     else {
+        out.reserve(out.size() + recv_buffer_.size());
+
         out.insert(out.end(), recv_buffer_.begin(), recv_buffer_.end());
 
         recv_buffer_.clear();

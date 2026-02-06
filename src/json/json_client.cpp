@@ -112,15 +112,14 @@ void JsonClient::send_data(const type_data_json& data)
 
 std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
 {
-    if (!tcp_thread_.has_received_data()) {
+    tcp_thread_.fetch_recv_data(recv_buffer_);
+
+    if (recv_buffer_.empty()) {
         return std::nullopt;
     }
+    
 
-    if (tcp_thread_.fetch_recv_data(recv_buffer_)) {
-        if (recv_buffer_.empty()) {
-            return std::nullopt;
-        }
-        
+    if (require_recv_packet_size_ == 0) {
         if (recv_buffer_.size() < HEADER_SIZE) {
             return std::nullopt;
         }
@@ -130,20 +129,20 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
 
         std::uint32_t body_length = ntohl(network_order_byte_length);
 
-        const std::uint32_t total_packet_size = body_length + HEADER_SIZE;
-
-        do {
-            tcp_thread_.fetch_recv_data(recv_buffer_);
-        } while (total_packet_size < recv_buffer_.size());
-
-        std::string json_str(recv_buffer_.begin() + HEADER_SIZE, recv_buffer_.begin() + total_packet_size);
-
-        recv_buffer_.clear();
-
-        return json_str_to_recv_cmd_data(json_str);
+        require_recv_packet_size_ = body_length + HEADER_SIZE;
     }
 
-    return std::nullopt;
+    if (recv_buffer_.size() < require_recv_packet_size_) {
+        return std::nullopt;
+    }
+
+    std::string json_str(recv_buffer_.begin() + HEADER_SIZE, recv_buffer_.begin() + require_recv_packet_size_);
+
+    recv_buffer_.erase(recv_buffer_.begin(), recv_buffer_.begin() + require_recv_packet_size_);
+
+    require_recv_packet_size_ = 0;
+
+    return json_str_to_recv_cmd_data(json_str);
 }
 
 std::vector<std::uint8_t> JsonClient::add_header_and_bytes(const std::string& str) const

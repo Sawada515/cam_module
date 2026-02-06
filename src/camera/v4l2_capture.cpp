@@ -17,6 +17,7 @@
 #include <cstring>
 #include <cerrno>
 #include <system_error>
+#include <climits>
 
 #include "camera/v4l2_capture.hpp"
 #include "logger/logger.hpp"
@@ -100,7 +101,7 @@ bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
     int ret = xpoll(&poll_fd, 1, 1000);
 
     if (ret == 0) {
-        frame.size = 0;
+        frame.valid_size = 0;
 
         return false;
     }
@@ -125,19 +126,32 @@ bool V4L2Capture::capture_frame(V4L2Capture::Frame& frame)
     
     size_t data_size = buf.bytesused;
 
+    // 事前に確保した領域より大きいデータが来たときの対策
     if (data_size > frame.data.size()) {
         frame.data.resize(data_size);
     }
 
-    std::memcpy(frame.data.data(), start_ptr, data_size);
+    if(fmt_ == frame_format::MJPEG) {
+        try {
+            store_clean_mjpeg(frame, start_ptr, data_size);           
+        }
+        catch (const std::exception& e) {
+            spdlog::warn("MJPEG cleanup failed: {}", e.what());
+
+            throw std::runtime_error("Failed to cleanup mjpeg data");
+        }
+    }
+    else {
+        std::memcpy(frame.data.data(), start_ptr, data_size);
+    
+        frame.valid_size = data_size;
+    }
 
     frame.width = width_;
     frame.height = height_;
 
-    frame.size = data_size;
-
     frame.bytesperline = bytesperline_;
-
+    
     frame.fmt = fmt_;
 
     if (xioctl(device_fd_, VIDIOC_QBUF, &buf) < 0) {
@@ -199,7 +213,7 @@ void V4L2Capture::reconfigure(frame_format fmt)
 
     stream_on();
 
-    constexpr int DROP_FRAM_NUM = 30;
+    constexpr int DROP_FRAM_NUM = 60;
 
     drop_frame(DROP_FRAM_NUM);
 }
@@ -274,8 +288,8 @@ void V4L2Capture::set_frame_format()
 
     fmt.fmt.pix.pixelformat = static_cast<std::uint32_t>(fmt_);
 
-    //fmt.fmt.pix.field = V4L2_FIELD_NONE;
-    fmt.fmt.pix.field = V4L2_FIELD_ANY;
+    fmt.fmt.pix.field = V4L2_FIELD_NONE;
+    //fmt.fmt.pix.field = V4L2_FIELD_ANY;
 
     if (xioctl(device_fd_, VIDIOC_S_FMT, &fmt) < 0) {
         throw std::system_error(errno, std::generic_category(), "invalid format");
@@ -356,6 +370,22 @@ bool V4L2Capture::try_format(std::uint16_t width, std::uint16_t height, uint32_t
 
 void V4L2Capture::drop_frame(int drop_frame_num)
 {
+    struct v4l2_control ctrl;
+
+    ctrl.id = V4L2_CID_EXPOSURE_AUTO;
+    ctrl.value = V4L2_EXPOSURE_MANUAL; 
+    xioctl(device_fd_, VIDIOC_S_CTRL, &ctrl);
+
+    ctrl.id = V4L2_CID_EXPOSURE_ABSOLUTE;
+    ctrl.value = 156;
+    xioctl(device_fd_, VIDIOC_S_CTRL, &ctrl);
+
+    usleep(1000 * 100); 
+
+    ctrl.id = V4L2_CID_EXPOSURE_AUTO;
+    ctrl.value = V4L2_EXPOSURE_AUTO;
+    xioctl(device_fd_, VIDIOC_S_CTRL, &ctrl);
+
     for (int i = 0; i < drop_frame_num; ++i) {
         v4l2_buffer buf{};
 
@@ -379,4 +409,45 @@ void V4L2Capture::drop_frame(int drop_frame_num)
             break;
         }
     }
+}
+
+void V4L2Capture::store_clean_mjpeg(Frame& frame, const uint8_t *buf_ptr, size_t buf_size)
+{
+    size_t start = SIZE_MAX;
+    size_t end = SIZE_MAX;
+
+    //SOI
+    for (size_t i = 0; i + 1 < buf_size; ++i) {
+        if (buf_ptr[i] == 0xFF && buf_ptr[i + 1] == 0xD8) {
+            start = i;
+
+            break;
+        }
+    }
+
+    //EOI
+    for (size_t i = start + 1; i + 1 < buf_size; ++i) {
+        if (buf_ptr[i] == 0xFF && buf_ptr[i + 1] == 0xD9) {
+            end = i + 2;
+
+            break;
+        }
+    }
+
+    //spdlog::info("MJPEG: start={}, end{}, size{}", start, end, buf_size);
+
+    if (start == SIZE_MAX || end == SIZE_MAX || end <= start) {
+        throw std::runtime_error("Invalid MJPEG frame (no JPEG markers)");
+    }
+
+    size_t jpeg_size = end - start;
+
+    // 事前に確保した領域より大きいデータが来たときの対策
+    if (jpeg_size > frame.data.size()) {
+        frame.data.resize(jpeg_size);
+    }
+
+    std::memcpy(frame.data.data(), buf_ptr + start, jpeg_size);
+
+    frame.valid_size = jpeg_size;
 }

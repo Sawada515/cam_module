@@ -16,7 +16,9 @@
 #include <optional>
 #include <span>
 
+//#include <opencv2/opencv.hpp>
 #include <opencv2/core/mat.hpp>
+#include <opencv2/core/utils/logger.hpp>
 
 #include "camera/capture_thread.hpp"
 #include "image_processor/image_processor.hpp"
@@ -25,8 +27,6 @@
 #include "read_config/read_config.hpp"
 #include "read_resistor_value/read_resistor_value.hpp"
 #include "send_image/send_image.hpp"
-
-#include <iostream>
 
 std::atomic<bool> g_is_running(true);
 
@@ -38,6 +38,8 @@ app_config_data_t read_config(const std::string &config_file);
 
 int main()
 {
+    cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);
+
     std::signal(SIGINT, signal_handler);
 
     app_config_data_t config = read_config(CONFIG_FILE);
@@ -57,8 +59,6 @@ int main()
     V4L2Capture::Frame frame_buffer;
     camera.create_empty_frame(frame_buffer);
 
-    std::cout << "finish init\n";
-
     json_client.start();
     send_image.create_thread();
 
@@ -76,10 +76,7 @@ int main()
     bool is_inference_and_send_json = false;
     int send_json_frame_id = 0;
 
-    std::cout << "start\n";
-
     while(g_is_running.load()) {
-        std::cerr << "1\n";
         std::optional<JsonClient::recv_cmd_data> recv_json_data = json_client.try_receive();
         if (recv_json_data.has_value()) {
             JsonClient::recv_cmd_data recv_data = recv_json_data.value();
@@ -109,26 +106,21 @@ int main()
                 spdlog::warn("Unknown command");
             }
         }
-        std::cerr << "2\n";
 
         if(!camera.get_latest_frame(frame_buffer)) {
             continue;
 
-            std::cerr << "get frame err\n";
-
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        std::cerr << "3\n";
 
-        if (frame_buffer.size > 0) {
-            spdlog::info("get frame OK");
-
+        if (frame_buffer.valid_size > 0) {
             ImageProcessor::raw_image_t  raw_image{
                 frame_buffer.width,
                 frame_buffer.height,
                 (frame_buffer.fmt == V4L2Capture::frame_format::MJPEG) ? ImageProcessor::pixel_format::MJPEG : ImageProcessor::pixel_format::YUV422,
                 frame_buffer.bytesperline,
-                std::span<const uint8_t>(frame_buffer.data.data(), frame_buffer.size)
+                frame_buffer.valid_size,
+                std::span<const uint8_t>(frame_buffer.data.data(), frame_buffer.valid_size)
             };
 
             image_processor.convert_raw_to_bgr(raw_image, bgr_mat);
@@ -143,6 +135,10 @@ int main()
                 is_inference_and_send_json = false;
             }
             else if (is_detected && raw_image.fmt == ImageProcessor::pixel_format::YUV422 && !is_inference_and_send_json) {
+                image_processor.draw_surround_box(bgr_mat, detect_results, cv::Scalar(0, 0, 255));
+
+//                cv::imwrite("debug.bmp", bgr_mat);
+
                 image_processor.inference_resistor_value(bgr_mat, raw_image.fmt, detect_results);
 
                 if (send_json_frame_id == INT_MAX) {
@@ -155,8 +151,6 @@ int main()
                     detect_results
                 };
 
-                spdlog::error("data send?");
-
                 json_client.send_data(send_data);
 
                 camera.request_change_format(V4L2Capture::frame_format::MJPEG);
@@ -166,8 +160,9 @@ int main()
 
             jpeg_buffer.clear();
 
+            image_processor.draw_surround_box(bgr_mat, detect_results, cv::Scalar(0, 0, 255));
+
             if(image_processor.jpeg_compression_bgr_data(bgr_mat, jpeg_buffer, config.image_processor.jpeg_quality)) {
-                spdlog::info("send image data ok");
                 send_image.set_send_data(
                     jpeg_buffer,
                     static_cast<std::uint16_t>(bgr_mat.cols),

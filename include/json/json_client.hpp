@@ -87,6 +87,8 @@ class JsonClient
         TcpThread tcp_thread_;
 
         std::vector<std::uint8_t> recv_buffer_;
+
+        size_t require_recv_packet_size_{0};
 };
 
 #endif
