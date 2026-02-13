@@ -38,6 +38,8 @@ app_config_data_t read_config(const std::string &config_file);
 
 int main()
 {
+    init_logger();
+
     cv::utils::logging::setLogLevel(cv::utils::logging::LOG_LEVEL_SILENT);
 
     std::signal(SIGINT, signal_handler);
@@ -84,7 +86,8 @@ int main()
             if (recv_data.cmd == JsonClient::cmd_kinds::SHUTDOWN) {
                 spdlog::info("recv json cmd shutdown");
 
-                //std::system("shutdown -h now");
+                std::system("shutdown -h now");
+
                 break;
             }
             else if (recv_data.cmd == JsonClient::cmd_kinds::CHANGE_FORMAT) {
