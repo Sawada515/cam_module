@@ -153,7 +153,7 @@ void TcpThread::thread_loop()
 
         if (pfd.revents & POLLIN) {
             std::uint8_t buf[2048];
-            ssize_t recv_length;
+            ssize_t recv_length = 0;
 
             while (1) {
                 TcpSocket::recv_state state = socket_->try_recv(buf, sizeof(buf), recv_length);

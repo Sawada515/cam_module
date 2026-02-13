@@ -122,7 +122,14 @@ void CaptureThread::thread_loop()
                 continue;
             }
 
-            if(!camera->capture_frame(back_frame)) {
+            try {
+                if(!camera->capture_frame(back_frame)) {
+                    continue;
+                }
+            }
+            catch (const std::exception& e) {
+                spdlog::warn("dtop mjepg data");
+
                 continue;
             }
 

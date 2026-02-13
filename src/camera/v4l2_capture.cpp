@@ -213,7 +213,7 @@ void V4L2Capture::reconfigure(frame_format fmt)
 
     stream_on();
 
-    constexpr int DROP_FRAM_NUM = 60;
+    constexpr int DROP_FRAM_NUM = 30;
 
     drop_frame(DROP_FRAM_NUM);
 }

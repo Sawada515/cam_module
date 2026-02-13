@@ -87,7 +87,7 @@ class JsonCodec {
         static std::string serialize_cmd(const type_cmd_json& cmd);
         static std::string serialize_data(const type_data_json& data);
 
-        static PacketVariant parse(const std::string& jsonString);
+        static PacketVariant parse(const std::string& json_string);
 };
 
 #endif

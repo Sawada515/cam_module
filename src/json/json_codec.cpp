@@ -150,27 +150,27 @@ std::string JsonCodec::serialize_data(const type_data_json& data)
     return j.dump();
 }
 
-JsonCodec::PacketVariant JsonCodec::parse(const std::string& jsonString)
+JsonCodec::PacketVariant JsonCodec::parse(const std::string& json_string)
 {
     try {
-        auto j = json::parse(jsonString);
-        std::string typeStr;
-        j.at("type").get_to(typeStr);
+        auto j = json::parse(json_string);
+        std::string type_str;
+        j.at("type").get_to(type_str);
 
-        if (typeStr == "cmd") {
+        if (type_str == "cmd") {
             return j.get<type_cmd_json>();
         }
-        else if (typeStr == "data") {
+        else if (type_str == "data") {
             return j.get<type_data_json>();
         }
         else {
-            throw std::runtime_error("Unknown packet type: " + typeStr);
+            throw std::runtime_error("Unknown packet type: " + type_str);
         }
     }
     catch (const json::parse_error& e) {
-        throw std::runtime_error(std::string("JSON parse error: ") + e.what());
+        throw std::runtime_error(std::string("JSON parse error: ") + e.what() + ":" + json_string);
     }
     catch (const json::type_error& e) {
-        throw std::runtime_error(std::string("JSON type error: ") + e.what());
+        throw std::runtime_error(std::string("JSON type error: ") + e.what() + ":" + json_string);
     }
 }

@@ -117,7 +117,6 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
     if (recv_buffer_.empty()) {
         return std::nullopt;
     }
-    
 
     if (require_recv_packet_size_ == 0) {
         if (recv_buffer_.size() < HEADER_SIZE) {
@@ -129,15 +128,13 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
 
         std::uint32_t body_length = ntohl(network_order_byte_length);
 
-        require_recv_packet_size_ = body_length + HEADER_SIZE;
-
-        if (require_recv_packet_size_ == 0) {
-            spdlog::warn("recv data is None");
-
-            recv_buffer_.erase(recv_buffer_.begin(), recv_buffer_.begin() + require_recv_packet_size_);
+        if (body_length == 0) {
+            recv_buffer_.erase(recv_buffer_.begin(), recv_buffer_.begin() + HEADER_SIZE);
 
             return std::nullopt;
         }
+
+        require_recv_packet_size_ = body_length + HEADER_SIZE;
     }
 
     if (recv_buffer_.size() < require_recv_packet_size_) {
