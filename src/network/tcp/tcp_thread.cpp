@@ -137,7 +137,11 @@ void TcpThread::thread_loop()
             if (errno == EINTR) {
                 continue;
             }
+
             socket_.reset();
+
+            std::this_thread::sleep_for(std::chrono::seconds(1));
+
             continue;
         }
 
@@ -166,6 +170,8 @@ void TcpThread::thread_loop()
 
                     socket_.reset();
 
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
+
                     break;
                 }
                 else {
@@ -189,6 +195,8 @@ void TcpThread::thread_loop()
                     spdlog::warn("TcpThread; Connectin closed");
 
                     socket_.reset();
+
+                    std::this_thread::sleep_for(std::chrono::seconds(1));
 
                     break;
                 }

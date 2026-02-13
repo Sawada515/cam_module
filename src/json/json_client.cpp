@@ -130,6 +130,14 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::try_receive()
         std::uint32_t body_length = ntohl(network_order_byte_length);
 
         require_recv_packet_size_ = body_length + HEADER_SIZE;
+
+        if (require_recv_packet_size_ == 0) {
+            spdlog::warn("recv data is None");
+
+            recv_buffer_.erase(recv_buffer_.begin(), recv_buffer_.begin() + require_recv_packet_size_);
+
+            return std::nullopt;
+        }
     }
 
     if (recv_buffer_.size() < require_recv_packet_size_) {
@@ -171,6 +179,7 @@ std::optional<JsonClient::recv_cmd_data> JsonClient::json_str_to_recv_cmd_data(s
     }
     catch (const std::exception& e) {
         spdlog::error("JsonClient: Parse or Convert Error: {}", e.what());
+
         return std::nullopt;
     }
 }
